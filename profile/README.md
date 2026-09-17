@@ -35,6 +35,7 @@ Interpreters, shells, and runtime environments.
 
 - **[goro](https://github.com/KarpelesLab/goro)** - PHP interpreter implemented in Go
 - **[goro-rs](https://github.com/KarpelesLab/goro-rs)** - PHP interpreter in Rust
+- **[rustygo](https://github.com/KarpelesLab/rustygo)** - Go → Rust compiler with a Rust runtime (GC, scheduler, channels, reflect) — design stage
 - **[gsh](https://github.com/KarpelesLab/gsh)** - Go native shell replacement
 - **[nodejs](https://github.com/KarpelesLab/nodejs)** - Node.js factory and pool for Go
 
