@@ -23,16 +23,8 @@ We develop and maintain a wide range of open-source tools and libraries, primari
 | [compcol](https://github.com/KarpelesLab/compcol) | 30+ compression codecs behind one streaming API, pure Rust | ![Stars](https://img.shields.io/github/stars/KarpelesLab/compcol) |
 | [cterm](https://github.com/KarpelesLab/cterm) | Terminal emulator optimized for AI coding tools | ![Stars](https://img.shields.io/github/stars/KarpelesLab/cterm) |
 | [graphitesql](https://github.com/KarpelesLab/graphitesql) | Pure, safe, `no_std` Rust re-implementation of SQLite | ![Stars](https://img.shields.io/github/stars/KarpelesLab/graphitesql) |
-| [OxideAV](https://github.com/OxideAV) | Pure-Rust media transcoding and streaming framework (sister org) | ![Stars](https://img.shields.io/github/stars/OxideAV/oxideav-workspace) |
-
----
-
-## Sister Organizations
-
-Some project families have grown large enough to get their own home:
-
-- **[OxideAV](https://github.com/OxideAV)** - Pure-Rust media transcoding and streaming: 140+ crates covering codecs (H.264/H.265/AV1/VP9, AAC/Opus/FLAC, JPEG XL, AVIF…), containers, subtitles, filters, the `oxideav` CLI and the `oxideplay` player. No C libraries, no FFI — every format implemented clean-room from the spec.
-- **[portablesql](https://github.com/portablesql)** - Portable SQL toolkit for Go: write database code once, run it on MySQL / MariaDB, PostgreSQL / CockroachDB and SQLite ([psql](https://github.com/portablesql/psql) core + per-engine drivers).
+| [OxideAV](https://github.com/OxideAV) | Pure-Rust media transcoding and streaming framework — 140+ codec, container and filter crates | ![Stars](https://img.shields.io/github/stars/OxideAV/oxideav-workspace) |
+| [portablesql](https://github.com/portablesql) | Portable SQL toolkit for Go — one codebase for MySQL, PostgreSQL and SQLite | ![Stars](https://img.shields.io/github/stars/portablesql/psql) |
 
 ---
 
@@ -59,13 +51,11 @@ Tooling built around AI-assisted development.
 - **[bnpm](https://github.com/KarpelesLab/bnpm)** - Sandboxed package manager using Linux namespaces
 
 ### Pure Rust Ecosystem
-A growing family of pure-Rust implementations — no C, no FFI, often `no_std`.
+A growing family of pure-Rust implementations — no C, no FFI, often `no_std`. See also [OxideAV](#media--audio) and [graphitesql](#databases--sql).
 
 **Applications & engines**
 - **[argus](https://github.com/KarpelesLab/argus)** - Web browser written in pure Rust (in-house engine, GUI + headless)
 - **[kataan](https://github.com/KarpelesLab/kataan)** - High-performance JavaScript engine in pure Rust (interpreter, bytecode VM, x86-64 JIT, WebAssembly)
-- **[graphitesql](https://github.com/KarpelesLab/graphitesql)** - `no_std` re-implementation of SQLite, file-format compatible, targets WebAssembly
-- **[pebbledb](https://github.com/KarpelesLab/pebbledb)** - Port of CockroachDB's Pebble LSM key-value storage engine
 - **[z3rs](https://github.com/KarpelesLab/z3rs)** - `no_std` port of the Z3 theorem prover, no GMP or native deps
 - **[mathesis](https://github.com/KarpelesLab/mathesis)** - Mathematica-style computational notebook running entirely in the browser ([live](https://karpeleslab.github.io/mathesis/))
 - **[rsurl](https://github.com/KarpelesLab/rsurl)** - Pure-Rust curl — HTTP/1-3, FTP, SFTP, WebSocket, and many more protocols
@@ -102,6 +92,14 @@ A growing family of pure-Rust implementations — no C, no FFI, often `no_std`.
 - **[rsupd](https://github.com/KarpelesLab/rsupd)** - Signed release distribution and in-place auto-updates (successor to goupd)
 - **[cacrt](https://github.com/KarpelesLab/cacrt)** - `no_std` curated CA root certificates by OpenSSL subject hash
 - **[psl2](https://github.com/KarpelesLab/psl2)** - Fast `no_std` Public Suffix List with built-in IDNA
+
+### Databases & SQL
+Database toolkits and storage engines.
+
+- **[portablesql](https://github.com/portablesql)** - Portable SQL toolkit for Go: write database code once, run it on MySQL / MariaDB, PostgreSQL / CockroachDB and SQLite
+  - [psql](https://github.com/portablesql/psql) core (struct binding, query builder, transactions, associations) with [MySQL](https://github.com/portablesql/psql-mysql), [PostgreSQL](https://github.com/portablesql/psql-pgsql) and [SQLite](https://github.com/portablesql/psql-sqlite) drivers — [docs](https://portablesql.github.io)
+- **[graphitesql](https://github.com/KarpelesLab/graphitesql)** - Pure-Rust, `no_std` re-implementation of SQLite, file-format compatible, targets WebAssembly
+- **[pebbledb](https://github.com/KarpelesLab/pebbledb)** - Rust port of CockroachDB's Pebble LSM key-value storage engine
 
 ### Cloud & Infrastructure
 Building blocks for cloud-native applications and distributed systems.
@@ -162,8 +160,11 @@ Pure Go implementations for various file system and archive formats.
 - **[gzscan](https://github.com/KarpelesLab/gzscan)** - Scanner for gzip files in disk images
 
 ### Media & Audio
-Multimedia processing libraries, often pure Go with no CGO.
+Multimedia processing libraries — pure Rust and pure Go, no C dependencies where possible.
 
+- **[OxideAV](https://github.com/OxideAV)** - Pure-Rust media transcoding and streaming — no C libraries, no FFI, every format implemented clean-room from the spec
+  - 140+ crates: video (H.264/H.265/H.266, AV1, VP8/VP9, ProRes…), audio (AAC, Opus, FLAC, MP3, AC-3, DTS…), images (PNG, WebP, JPEG XL, AVIF, HEIF…), containers (MP4, Matroska, Ogg…) and subtitles
+  - The `oxideav` CLI and `oxideplay` player ship from [oxideav-workspace](https://github.com/OxideAV/oxideav-workspace); use crates individually or all at once via [oxideav-meta](https://github.com/OxideAV/oxideav-meta)
 - **[avgo](https://github.com/KarpelesLab/avgo)** - AV library in Go
 - **[ffprobe](https://github.com/KarpelesLab/ffprobe)** - FFprobe tools in Go
 - **[hlsmaker](https://github.com/KarpelesLab/hlsmaker)** - HLS stream creation
@@ -242,8 +243,8 @@ General-purpose Go libraries and tools.
 
 Our 240+ repositories are predominantly written in:
 
-- **Go** - Cloud infrastructure, networking, crypto, language runtimes, and utilities — plus [portablesql](https://github.com/portablesql)
-- **Rust** - A fast-growing pure-Rust ecosystem (browser, JS engine, SQLite, kernel, toolchain, crypto, networking) — plus the [OxideAV](https://github.com/OxideAV) media stack
+- **Go** - Cloud infrastructure, networking, crypto, language runtimes, and utilities, including [portablesql](https://github.com/portablesql)
+- **Rust** - A fast-growing pure-Rust ecosystem (browser, JS engine, SQLite, kernel, toolchain, crypto, networking), including the [OxideAV](https://github.com/OxideAV) media stack
 - **JavaScript/TypeScript** - Frontend frameworks and React/Vue components
 - **C/C++** - Static library bindings and low-level tools
 - **Python** - USD tools and analysis utilities
