@@ -73,6 +73,7 @@ A growing family of pure-Rust implementations — no C, no FFI, often `no_std`. 
 - **[latticefoundry](https://github.com/KarpelesLab/latticefoundry)** - Clean-room compiler back-end framework (SSA IR, codegen, object files, linker core)
 - **[qld](https://github.com/KarpelesLab/qld)** - Fast parallel linker, drop-in for GNU ld / gold / lld / mold
 - **[rsasm](https://github.com/KarpelesLab/rsasm)** - Multi-target assembler accepting real-world asm syntaxes
+- **[reticle](https://github.com/KarpelesLab/reticle)** - VHDL and Verilog compiler from scratch: simulation, synthesis, formal verification, FPGA place-and-route, bitstreams and JTAG programming
 - **[univdreams](https://github.com/KarpelesLab/univdreams)** - Universal decompiler + compiler (ELF, PE, Mach-O round-trip)
 - **[rsemu](https://github.com/KarpelesLab/rsemu)** - Multiplatform emulator built on a generic framework, machines described by config files
 - **[x11anywhere](https://github.com/KarpelesLab/x11anywhere)** - Portable X11 server with native backends for Linux, macOS and Windows
@@ -83,13 +84,16 @@ A growing family of pure-Rust implementations — no C, no FFI, often `no_std`. 
 - **[purecrypto-tpm](https://github.com/KarpelesLab/purecrypto-tpm)** - TPM 2.0 stack speaking the wire protocol directly, no tpm2-tss
 - **[puremp](https://github.com/KarpelesLab/puremp)** - Arbitrary-precision arithmetic: integers, rationals, MPFR-class floats, polynomials, matrices
 - **[compcol](https://github.com/KarpelesLab/compcol)** - 30+ compression/decompression codecs behind one uniform streaming API
+- **[minizlib](https://github.com/KarpelesLab/minizlib)** - Tiny gzip/zlib/deflate codec: `no_std`, no allocation, no `unsafe`, ~2.5 KB decompressor
 - **[minlz-rs](https://github.com/KarpelesLab/minlz-rs)** - S2 compression, binary-compatible with Go's klauspost/compress/s2
 - **[anydcode](https://github.com/KarpelesLab/anydcode)** - Encode/decode 50+ 1D/2D barcode symbologies (QR, Data Matrix, PDF417, Aztec, App Clip Codes…)
 - **[charcode](https://github.com/KarpelesLab/charcode)** - WHATWG Encoding Standard character conversion, zero deps, no `unsafe`
 - **[tomlproc](https://github.com/KarpelesLab/tomlproc)** - Complete TOML 1.1.0 parser and serializer, zero deps, `no_std`
+- **[emjson](https://github.com/KarpelesLab/emjson)** - Streaming JSON parser, writer and in-place editor for embedded systems, in a few hundred bytes of RAM
 - **[noroi](https://github.com/KarpelesLab/noroi)** - Rich curses-style terminal UI with zero external crates
 - **[stipple](https://github.com/KarpelesLab/stipple)** - Self-drawn, themeable cross-platform UI toolkit (desktop, mobile, web)
 - **[ldtray](https://github.com/KarpelesLab/ldtray)** - Cross-platform tray icons with no compile-time GUI linkage
+- **[rawusb](https://github.com/KarpelesLab/rawusb)** - Dependency-free cross-platform USB access in the spirit of libusb (Linux, macOS, Windows)
 - **[rsupd](https://github.com/KarpelesLab/rsupd)** - Signed release distribution and in-place auto-updates (successor to goupd)
 - **[cacrt](https://github.com/KarpelesLab/cacrt)** - `no_std` curated CA root certificates by OpenSSL subject hash
 - **[psl2](https://github.com/KarpelesLab/psl2)** - Fast `no_std` Public Suffix List with built-in IDNA
