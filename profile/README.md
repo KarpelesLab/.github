@@ -15,15 +15,15 @@ We develop and maintain a wide range of open-source tools and libraries, primari
 | Project | Description | Stars |
 |---------|-------------|-------|
 | [goro](https://github.com/KarpelesLab/goro) | PHP interpreter implemented in Go | ![Stars](https://img.shields.io/github/stars/KarpelesLab/goro) |
-| [usdpython](https://github.com/KarpelesLab/usdpython) | Apple's usdzconvert and USD-related tools | ![Stars](https://img.shields.io/github/stars/KarpelesLab/usdpython) |
 | [teamclaude](https://github.com/KarpelesLab/teamclaude) | Multi-account Claude proxy with quota-based rotation | ![Stars](https://img.shields.io/github/stars/KarpelesLab/teamclaude) |
+| [usdpython](https://github.com/KarpelesLab/usdpython) | Apple's usdzconvert and USD-related tools | ![Stars](https://img.shields.io/github/stars/KarpelesLab/usdpython) |
 | [reflink](https://github.com/KarpelesLab/reflink) | Reflink (copy-on-write) file copy in Go | ![Stars](https://img.shields.io/github/stars/KarpelesLab/reflink) |
+| [OxideAV](https://github.com/OxideAV) | Pure-Rust media transcoding and streaming framework — 140+ codec, container and filter crates | ![Stars](https://img.shields.io/github/stars/OxideAV/oxideav-workspace) |
 | [squashfs](https://github.com/KarpelesLab/squashfs) | SquashFS read/write implementation in pure Go | ![Stars](https://img.shields.io/github/stars/KarpelesLab/squashfs) |
-| [magictls](https://github.com/KarpelesLab/magictls) | Automatic PROXY, PROXYv2 and TLS support on TCP streams | ![Stars](https://img.shields.io/github/stars/KarpelesLab/magictls) |
+| [fstool](https://github.com/KarpelesLab/fstool) | Build, inspect, convert and repack disk images and filesystems in pure Rust | ![Stars](https://img.shields.io/github/stars/KarpelesLab/fstool) |
 | [compcol](https://github.com/KarpelesLab/compcol) | 30+ compression codecs behind one streaming API, pure Rust | ![Stars](https://img.shields.io/github/stars/KarpelesLab/compcol) |
 | [cterm](https://github.com/KarpelesLab/cterm) | Terminal emulator optimized for AI coding tools | ![Stars](https://img.shields.io/github/stars/KarpelesLab/cterm) |
 | [graphitesql](https://github.com/KarpelesLab/graphitesql) | Pure, safe, `no_std` Rust re-implementation of SQLite | ![Stars](https://img.shields.io/github/stars/KarpelesLab/graphitesql) |
-| [OxideAV](https://github.com/OxideAV) | Pure-Rust media transcoding and streaming framework — 140+ codec, container and filter crates | ![Stars](https://img.shields.io/github/stars/OxideAV/oxideav-workspace) |
 | [portablesql](https://github.com/portablesql) | Portable SQL toolkit for Go — one codebase for MySQL, PostgreSQL and SQLite | ![Stars](https://img.shields.io/github/stars/portablesql/psql) |
 
 ---
