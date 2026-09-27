@@ -8,6 +8,8 @@ We develop and maintain a wide range of open-source tools and libraries, primari
 [![OxideAV](https://img.shields.io/badge/GitHub-OxideAV-orange)](https://github.com/OxideAV)
 [![portablesql](https://img.shields.io/badge/GitHub-portablesql-00ADD8)](https://github.com/portablesql)
 
+**For AI agents:** start at [`llms.txt`](https://github.com/KarpelesLab/.github/blob/master/llms.txt) for a map of our packages, with [usage docs](https://github.com/KarpelesLab/.github/tree/master/docs) covering the [pure-Rust ecosystem](https://github.com/KarpelesLab/.github/blob/master/docs/rust/README.md), [Go modules](https://github.com/KarpelesLab/.github/blob/master/docs/go.md) and [frontend libraries](https://github.com/KarpelesLab/.github/blob/master/docs/frontend.md).
+
 ---
 
 ## Featured Projects
@@ -113,7 +115,6 @@ Building blocks for cloud-native applications and distributed systems.
 - **[clouddb](https://github.com/KarpelesLab/clouddb)** - Decentralized indexed database using LevelDB
 - **[cloudhttp](https://github.com/KarpelesLab/cloudhttp)** - Easy SSL HTTP server for AWS, GCP, etc.
 - **[cloudinfo](https://github.com/KarpelesLab/cloudinfo)** - Fetch info on current cloud environment
-- **[lambda](https://github.com/KarpelesLab/lambda)** - Lambda utilities
 
 ### Networking & Protocols
 Low-level networking tools and protocol implementations.
@@ -197,7 +198,8 @@ Tools for building multilingual applications.
 - **[strftime](https://github.com/KarpelesLab/strftime)** - strftime with BCP 47 language tags
 - **[strtotime](https://github.com/KarpelesLab/strtotime)** / **[strtotime-rs](https://github.com/KarpelesLab/strtotime-rs)** - PHP-compatible strtotime() (Go / `no_std` Rust)
 - **[gotz](https://github.com/KarpelesLab/gotz)** / **[timezone-data-rs](https://github.com/KarpelesLab/timezone-data-rs)** - Raw IANA timezone data, embedded (Go / Rust)
-- **[goicu](https://github.com/KarpelesLab/goicu)** / **[intlrs](https://github.com/KarpelesLab/intlrs)** - ICU-compatible features: transliteration, collation, normalization (Go / `no_std` Rust)
+- **[goicu](https://github.com/KarpelesLab/goicu)** - ICU-compatible transliteration and text break iteration for Go
+- **[intlrs](https://github.com/KarpelesLab/intlrs)** - `no_std` ICU analog in Rust: normalization, collation, segmentation, bidi, IDNA, CLDR formatting
 - **[lngdb](https://github.com/KarpelesLab/lngdb)** - Language database for Go
 - **[countrydb](https://github.com/KarpelesLab/countrydb)** - Country database
 - **[currencydb](https://github.com/KarpelesLab/currencydb)** - Currency database
@@ -239,6 +241,7 @@ General-purpose Go libraries and tools.
 - **[ringbuf](https://github.com/KarpelesLab/ringbuf)** - Ring buffer with readers
 - **[weak](https://github.com/KarpelesLab/weak)** - Weak reference map (Go 1.18+)
 - **[textutil](https://github.com/KarpelesLab/textutil)** - Text processing (word wrapping, etc.)
+- **[lambda](https://github.com/KarpelesLab/lambda)** - Lambda calculus: Church encodings, reduction and Tromp diagrams (text/SVG)
 - **[typutil](https://github.com/KarpelesLab/typutil)** - Type conversion utilities
 - **[rndstr](https://github.com/KarpelesLab/rndstr)** - Random string generation
 
