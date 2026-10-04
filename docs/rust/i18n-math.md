@@ -1,6 +1,6 @@
-# Internationalization, Time & Mathematics
+# Internationalization, Time, Mathematics & Geometry
 
-Pure-Rust, dependency-free building blocks for text and locale handling, dates and time zones, arbitrary-precision math and SMT solving. `timezone-data` is the base layer: an embedded, pre-parsed IANA tz database used by both `strtotime` (PHP-style date parsing) and `intl` (an ICU analog covering Unicode algorithms and CLDR formatting). `puremp` is a GMP/MPFR-class bignum library, and `z3rs` is a pure-Rust port of the Z3 theorem prover built on top of `puremp`. Everything here is `no_std` (most of it with `alloc`) and has no C or `-sys` dependencies.
+Pure-Rust, dependency-free building blocks for text and locale handling, dates and time zones, arbitrary-precision math, SMT solving and 2D geometry. `timezone-data` is the base layer: an embedded, pre-parsed IANA tz database used by both `strtotime` (PHP-style date parsing) and `intl` (an ICU analog covering Unicode algorithms and CLDR formatting). `puremp` is a GMP/MPFR-class bignum library, and `z3rs` is a pure-Rust port of the Z3 theorem prover built on top of `puremp`. `polyclip` does exact integer 2D polygon geometry (booleans, offsetting, triangulation) and backs the `cadlab` PCB tool. Everything here is `no_std` (most of it with `alloc`) and has no C or `-sys` dependencies.
 
 ## Quick pick
 
@@ -14,10 +14,11 @@ Pure-Rust, dependency-free building blocks for text and locale handling, dates a
 | Big integers, exact rationals, arbitrary-precision floats with correct rounding, decimals | [`puremp`](#puremp) |
 | Factorization, primality proofs, polynomials, matrices, finite fields, elliptic curves, number fields | [`puremp`](#puremp) |
 | SMT solving (SMT-LIB 2), SAT (DIMACS), a Z3 replacement without native libs | [`z3rs`](#z3rs) |
+| Exact integer 2D polygon booleans, offsetting, distance/DRC queries, triangulation | [`polyclip`](#polyclip) |
 
 ## strtotime-rs
 
-**Repo:** https://github.com/KarpelesLab/strtotime-rs · **Crate:** `strtotime` (git only; not on crates.io) · **License:** MIT · **Status:** usable (matches PHP on its full 669-case test corpus)
+**Repo:** https://github.com/KarpelesLab/strtotime-rs · **Crate:** `strtotime` (crates.io `0.1.2`) · **License:** MIT · **Status:** usable (matches PHP on its full 669-case test corpus)
 
 A `#![no_std]`, allocation-free port of PHP's `strtotime()` (via the Go library `KarpelesLab/strtotime`). It parses absolute and relative date/time expressions into a Unix timestamp relative to a base instant, in a given time zone. `#![forbid(unsafe_code)]`. The only dependency is the optional `timezone-data` crate.
 
@@ -27,9 +28,9 @@ A `#![no_std]`, allocation-free port of PHP's `strtotime()` (via the Go library 
 **Add it:**
 ```toml
 [dependencies]
-strtotime = { git = "https://github.com/KarpelesLab/strtotime-rs" }
+strtotime = "0.1"
 # minimal build, no IANA database (UTC, numeric offsets, abbreviations only):
-# strtotime = { git = "https://github.com/KarpelesLab/strtotime-rs", default-features = false }
+# strtotime = { version = "0.1", default-features = false }
 ```
 
 **Key features / cargo features:**
@@ -64,7 +65,6 @@ let ts = strtotime("2023-07-04 09:00", 0, Tz::Iana(ny)).unwrap();
 - `strtotime()` truncates to whole seconds, as PHP does. Use `strtotime_civil` or `strtotime_micros` for fractions. Nanosecond input is truncated to microseconds.
 - `base_unix` is ignored for fully absolute inputs.
 - In DST gaps and folds, wall-clock times resolve using PHP's fall-forward behavior.
-- The manifest declares `timezone-data` with both a version and a sibling `path = "../timezone-data-rs"`. If a plain git dependency fails to resolve, clone both repos side by side and use a `path` dependency, or build with `default-features = false`.
 - `Tz::Iana` requires a `timezone_data::Zone` from `timezone-data` 0.2. Add `timezone-data = "0.2"` to call `load()` yourself.
 
 ## timezone-data-rs
@@ -108,12 +108,12 @@ if let Some(m) = z.meta() {
 ```
 
 **Gotchas:**
-- 0.2 is a breaking change from 0.1: `Zone` and `ZoneType` lost their lifetime parameter, and `types()`, `transitions()` and `leap_seconds()` now return slices. `strtotime` uses 0.2 while `intl` 0.6 depends on `timezone-data` 0.1, so a build that uses both links two copies, and their `Zone` types are not interchangeable.
+- 0.2 is a breaking change from 0.1: `Zone` and `ZoneType` lost their lifetime parameter, and `types()`, `transitions()` and `leap_seconds()` now return slices. `strtotime` 0.1.2 and `intl` 0.6.4 both use 0.2, so they share one copy and one `Zone` type. Older `intl` releases (0.6.3 and earlier) still pulled in 0.1.
 - `Zone` is `Copy`, so it is cheap to pass by value.
 
 ## intlrs
 
-**Repo:** https://github.com/KarpelesLab/intlrs · **Crate:** `intl` (crates.io `0.6.3`) · **License:** MIT · **Status:** usable (official Unicode conformance suites pass 100% for normalization, collation, grapheme/word/sentence; about 99.98% for line breaking and 99.996% for bidi)
+**Repo:** https://github.com/KarpelesLab/intlrs · **Crate:** `intl` (crates.io `0.6.4`) · **License:** MIT · **Status:** usable (official Unicode conformance suites pass 100% for normalization, collation, grapheme/word/sentence; about 99.98% for line breaking and 99.996% for bidi)
 
 A pure-Rust, always-`#![no_std]` analog of ICU, targeting Unicode 17.0.0 and CLDR. UCD property tables are compiled into `const fn` `match` lookups, and CLDR data is embedded with `include_bytes!`, so nothing is initialized at runtime. The formatters need `alloc`, but the property lookups and plural rules work without an allocator. MSRV is 1.88 and edition 2024. The only optional dependency is `timezone-data` 0.1.
 
@@ -165,14 +165,13 @@ let offset = ny.offset_at(1_700_000_000); // seconds east of UTC
 **Other entry points (verified names):** `unicode::collate::Collator::new(..).with_numeric(true)`, `Tailoring::for_locale("sv")`, `unicode::idna::to_ascii`, `unicode::spoof::skeleton`, `unicode::words`/`sentences`/`line_breaks`, `unicode::bidi::process`, `locale::Locale::parse(..).maximize()`, `locale::negotiate`, `number::format_compact`, `list::format_list(locale, &[..], &ListFormatOptions)`, `relative::format_relative(locale, f64, RelativeUnit::Day, &opts)`, `datetime::format_date(locale, &DateTime, DateStyle::Long)`, `datetime::DateTime::parse_iso8601`, `unit::format_unit`, `unit::format_duration`, `display::language_name`, and `display::region_name`.
 
 **Gotchas:**
-- The README's TOML snippets still say `intl = "0.1"`, but the current release is 0.6.x, so depend on `"0.6"`.
 - Most formatter functions take a BCP-47 locale string as their first argument and return `String`. Unknown locales fall back through CLDR inheritance to root.
 - Missing non-Gregorian calendar features produce a compile error (`format_<cal>_date` does not exist) or `None`, never a wrong Gregorian string.
 - Number formatting uses the locale's default numbering system, as ECMA-402 does. For example, `ar-EG` yields Arabic-Indic digits.
 
 ## puremp
 
-**Repo:** https://github.com/KarpelesLab/puremp · **Crate:** `puremp` (crates.io `0.2.4`) · **License:** MIT · **Status:** usable (broad, actively developed; some advanced algorithms are marked correctness-first rather than tuned for speed)
+**Repo:** https://github.com/KarpelesLab/puremp · **Crate:** `puremp` (crates.io `0.2.5`) · **License:** MIT · **Status:** usable (broad, actively developed; some advanced algorithms are marked correctness-first rather than tuned for speed)
 
 A clean-room, pure-Rust GMP+MPFR-class arbitrary-precision library covering `Nat`, `Int`, `Rational`, `InfRational`, correctly rounded binary `Float` and `FixedFloat`, `Decimal`, `Dyadic`, `Padic`, `Complex<T>`, `ModInt`, `Poly<T>`, `Matrix<T>`, `Interval`, `Ball`, `GaloisField`, `EllipticCurve`, `Algebraic`/`Quadratic` and `NumberField`. It is `no_std` + `alloc` (CI-verified on `thumbv7em-none-eabi`), its core has zero dependencies, and `unsafe` is denied everywhere except the opt-in C ABI. It also ships a CLI calculator and a C library (`include/puremp.h`). MSRV is 1.88 and edition 2024.
 
@@ -212,7 +211,7 @@ assert_eq!(pi.to_decimal_string(20), "3.14159265358979323846");
 ```
 
 **Gotchas:**
-- `Rational::new` returns `Rational` and **panics** on a zero denominator. Use `Rational::checked_new` to get an `Option` instead. The README quick-start wrongly shows `Rational::new(..)?`.
+- `Rational::new` returns `Rational` and **panics** on a zero denominator. Use `Rational::checked_new` to get an `Option` instead.
 - Arithmetic is mostly method-based (`add`, `pow`, `modpow`) and takes references. `Float` operations take an explicit precision in bits and a `RoundingMode`.
 - The `Int` API is not constant-time.
 
@@ -261,3 +260,68 @@ assert_eq!(ctx.check(), SatResult::Unsat);
 - `Solver` methods return `Result<_, String>` for parse and type errors. `SatResult::Unknown` means a budget ran out or the fragment is undecided, and it is never a guess.
 - The crate name is `z3rs`, not `z3`. The `z3` crate on crates.io is a different project that binds native Z3.
 - Version 0.0.x means the API may change between releases.
+
+## polyclip
+
+**Repo:** https://github.com/KarpelesLab/polyclip · **Crate:** `polyclip` (crates.io `0.0.4`) · **License:** MIT · **Status:** usable, pre-1.0. It is covered by property tests, weekly `cargo-fuzz` runs of every public operation, and differential tests against Clipper2 (the `oracle/` crate). It was built for and is used by [`cadlab`](apps-engines.md#cadlab).
+
+2D polygon geometry on integer `i64` coordinates with exact predicates (`i128`/wide arithmetic). It does booleans, offsetting, arc approximation, distance queries, fracturing, triangulation and simplification. Output is **guaranteed valid after snap rounding**: simple rings, no crossings, correct nesting, vertices moved by at most √2/2. It is also **canonical and bit-identical across platforms**: outer rings are CCW and holes CW, each ring starts at its smallest vertex, and polygons are sorted. The crate does not panic, uses no `unsafe` and has no global state. Its only required dependency is `libm`, which keeps arc results deterministic.
+
+**Use it when:**
+- You need robust polygon clipping, offsetting or minimum-distance checks where floating-point drift is unacceptable, as in PCB/EDA (zone fills, DRC, Gerber regions), CNC/laser toolpaths, GIS on a fixed grid, or deterministic simulations.
+- You want a pure-Rust Clipper2 alternative with stronger validity guarantees.
+
+**Don't use it when / limits:**
+- You work in floats. Pick a scale yourself (cadlab uses 1 unit = 1 nm). The supported range is ±2^40, and coordinates outside it return an error.
+- `curved_boolean` keeps arcs as arcs, but it approximates and then reconstructs them, so short polyline pieces remain near tangencies.
+- A union of 50,000 heavily overlapping circles takes about 3 s, single-threaded (Clipper2 takes minutes on the same input). Typical zone-fill, offset and distance workloads match or beat Clipper2.
+- The API is still 0.0.x. Pin the patch version.
+
+**Add it:**
+```toml
+[dependencies]
+polyclip = "0.0.4"
+# polyclip = { version = "0.0.4", features = ["serde", "rayon"] }
+```
+
+**Key features / cargo features:**
+- **Booleans:** `boolean(op, &a, &b, rule)`, the `Boolean::new().subject(..).clip(..).op(..).execute()` builder, and `union_all` (an N-ary union that also normalizes self-intersecting input). Fill rules are `EvenOdd`, `NonZero`, `Positive` and `Negative`. Output is a `PolygonSet` (`Vec<Polygon { outer, holes }>`) or a `PolyTree`. `clip_paths` handles open paths.
+- **Offsetting:** `offset`, `offset_tree`, `offset_paths` (`EndCap`), `offset_shape`, and `opening`/`closing` for minimum-width enforcement. Joins are `Round`, `Miter`, `Bevel` and `Square`.
+- **Arcs:** `Circle`, `Curve` and `Shape` are approximated by `ArcTol::new(max_err, Side::{Outside, Inside, Nearest})`, so clearances are never under-estimated.
+- **Incremental:** `ZoneFill` inserts, updates or removes obstacles by `u64` id, and refills in well under a millisecond with the same result as a full recompute.
+- **Provenance tags:** a `u64` per edge survives booleans and offsets (the `*_tagged` functions, `arcs_from_tags`).
+- **Queries:** `area2`, `centroid`, `locate`, `intersects`, `contains`, `distance` (with the closest points), `distance_sq`, and a fast `distance_less_than` for DRC.
+- **Utilities:** `validate`, `fracture`/`fracture_set` (holes joined by zero-width cut-ins, for Gerber regions), `simplify_*`, `convex_hull`, `minkowski_sum`, `triangulate`, `triangulate_delaunay`, `trapezoids`.
+- `serde` derives `Serialize`/`Deserialize` for all types. `rayon` parallelizes boolean phases, and the output is identical for any thread count.
+
+**Example:**
+```rust
+use polyclip::*;
+
+fn main() -> polyclip::Result<()> {
+    // 1 unit = 1 nm here, so 10_000_000 = 10 mm.
+    let zone = Ring::from([(0, 0), (10_000_000, 0), (10_000_000, 10_000_000), (0, 10_000_000)]);
+    let tol = ArcTol::new(1_000, Side::Outside); // arcs within 1 um, never inside the true arc
+    let pad = Circle::new(Point::new(3_000_000, 3_000_000), 500_000).to_ring(tol)?;
+    let keepout = offset(&pad, 200_000, Join::Round, tol)?; // 0.2 mm clearance
+
+    let fill = boolean(Op::Difference, &zone, &keepout, FillRule::NonZero)?;
+    assert_eq!((fill.len(), fill[0].holes.len()), (1, 1));
+
+    let regions: Vec<Ring> = fill.iter().map(fracture).collect::<Result<_>>()?; // Gerber regions
+    assert_eq!(regions.len(), 1);
+
+    let track = Path::from([(0, 2_500_000), (10_000_000, 2_500_000)]);
+    assert!(distance_less_than(&track, &pad, 200_000)); // DRC-style check
+
+    let mut zf = ZoneFill::new(&zone, FillRule::NonZero)?; // incremental refill
+    zf.insert(1, &keepout)?;
+    assert_eq!(zf.fill(), fill);
+    Ok(())
+}
+```
+
+**Gotchas:**
+- `area2`/`ring_area2` return **twice** the signed area as `i128`.
+- Inputs can be any `RingSource` (`Ring`, `Polygon`, `PolygonSet`, slices of rings), so an `offset` result can be passed straight back in as a clip operand.
+- cadlab currently pins `polyclip 0.0.2`. Under Cargo's 0.0.x rules each patch release is semver-incompatible, so the two versions do not unify in a dependency tree.

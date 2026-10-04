@@ -7,7 +7,7 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 ## Overview
 
 - [Rust ecosystem overview](docs/rust/README.md): conventions (crate names, crates.io vs git, features, maturity) and how the Rust crates depend on each other
-- [Go packages](docs/go.md): all KarpelesLab Go modules by category (runtimes, cloud, networking, crypto, blockchain, filesystems, media, parsers, i18n, hardware, utilities), with a fuller section on the portablesql psql toolkit (MySQL/PostgreSQL/SQLite)
+- [Go packages](docs/go.md): all KarpelesLab Go modules by category (runtimes, cloud, networking, crypto, blockchain, filesystems, media, parsers, i18n, hardware incl. car-navigation firmware, utilities), with a fuller section on the portablesql psql toolkit (MySQL/PostgreSQL/SQLite)
 - [Frontend packages](docs/frontend.md): KLB platform client libraries (klbfw JS client and React/Vue/i18next add-ons, klbfw-describe, login modules, vuetemplate, Rust/Swift/Flutter clients); API docs live in https://github.com/KarpelesLab/integration-docs
 
 ## Rust: cryptography, TLS & networking
@@ -16,6 +16,7 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 - [purecrypto-tpm](docs/rust/crypto-networking.md#purecrypto-tpm): early TPM 2.0 stack (wire protocol, HMAC sessions, seal/unseal) over the Linux device or swtpm, no tpm2-tss
 - [cacrt](docs/rust/crypto-networking.md#cacrt): curated CA root certificates as static DER, no_std/no-alloc, looked up by OpenSSL subject hash
 - [psl2](docs/rust/crypto-networking.md#psl2): Public Suffix List lookups (eTLD+1, cookie domains) with an allocation-free no_std core and built-in IDNA
+- [dnsbox](docs/rust/crypto-networking.md#dnsbox): zero-copy no_std DNS wire-format parser/builder with DNSSEC via purecrypto (early; use git)
 - [puressh](docs/rust/crypto-networking.md#puressh): SSH client/server library and CLI suite (ssh, sftp, scp, sshd, ssh-keygen), sans-I/O core with blocking/async/tokio/mio frontends, PQ hybrid key exchange
 - [httpsd](docs/rust/crypto-networking.md#httpsd): sans-I/O HTTP/1.1, /2 and /3 server library and CLI with pluggable runtimes and ACME auto-certificates
 - [rsurl](docs/rust/crypto-networking.md#rsurl): pure-Rust curl as library, C ABI and CLI: HTTP/1.1-3, FTP, SFTP/SCP, WebSocket and more; async API also runs in browser WASM
@@ -25,8 +26,8 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 
 ## Rust: compression, encodings & data formats
 
-- [compcol](docs/rust/data-formats.md#compcol): no_std, zero-dep, forbid-unsafe collection of 40+ compression codecs behind one streaming trait, with runtime factory, format detection, io/tokio adapters and CLI
-- [minizlib](docs/rust/data-formats.md#minizlib): tiny no_std, no-alloc, no-panic gzip/zlib/deflate for microcontrollers (~2.5 KB decompress, ~1 KB compress)
+- [compcol](docs/rust/data-formats.md#compcol): no_std, zero-dep, forbid-unsafe collection of 40+ compression codecs behind one streaming trait, with runtime factory, format detection, io/tokio adapters, CLI, and an allocation-free `embed` mode for microcontrollers (tiny gzip/zlib/deflate)
+- [minizlib](docs/rust/data-formats.md#minizlib): DEPRECATED, superseded by compcol's `embed` feature (`compcol::embed::flate`, same API)
 - [minlz-rs](docs/rust/data-formats.md#minlz-rs): S2/Snappy byte-compatible with Go klauspost/compress/s2, plus MinLZ; very fast decode
 - [emjson](docs/rust/data-formats.md#emjson): no_std, no-alloc streaming JSON parser, writer and in-place editor in a few hundred bytes of RAM
 - [tomlproc](docs/rust/data-formats.md#tomlproc): zero-dependency no_std+alloc TOML 1.1.0 parser/serializer with ordered tree, spans, optional serde
@@ -34,13 +35,14 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 - [anydcode](docs/rust/data-formats.md#anydcode): crate `anyd`, no_std encoder/decoder for ~40 1D/2D barcode symbologies with image/video detection and WASM
 - [xuid-rs](docs/rust/data-formats.md#xuid-rs): type-prefixed base32 UUIDs (UUIDv7 default), compatible with Go xuid, serde/sqlx/rusqlite support
 
-## Rust: internationalization, time & mathematics
+## Rust: internationalization, time, mathematics & geometry
 
 - [intlrs](docs/rust/i18n-math.md#intlrs): crate `intl`, no_std ICU analog: Unicode normalization, collation, segmentation, bidi, IDNA, CLDR formatting (numbers, dates, plurals, units, calendars, transliteration)
-- [strtotime-rs](docs/rust/i18n-math.md#strtotime-rs): no_std, no-alloc PHP-compatible strtotime() with DST-aware IANA zones (git only)
+- [strtotime-rs](docs/rust/i18n-math.md#strtotime-rs): no_std, no-alloc PHP-compatible strtotime() with DST-aware IANA zones
 - [timezone-data-rs](docs/rust/i18n-math.md#timezone-data-rs): embedded, pre-parsed IANA tz database: offsets, DST, transitions, POSIX rules, leap seconds
 - [puremp](docs/rust/i18n-math.md#puremp): GMP/MPFR-class arbitrary precision (Int, Rational, correctly rounded Float, Decimal, polynomials, matrices, number theory) with CLI and C ABI
 - [z3rs](docs/rust/i18n-math.md#z3rs): no_std port of the Z3 SMT solver (SMT-LIB 2, DIMACS, all theories), only dependency puremp, Z3-compatible CLI
+- [polyclip](docs/rust/i18n-math.md#polyclip): exact integer 2D polygon geometry (booleans, offsets, arcs, distance, fracture, triangulation, incremental zone fill); deterministic Clipper2 alternative
 
 ## Rust: systems & toolchain
 
@@ -55,6 +57,7 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 - [univdreams](docs/rust/systems-toolchain.md#univdreams): decompiler/recompiler with byte-exact ELF/PE/Mach-O/NE round-trip (`ud` CLI) and sandboxed Win32 DLL emulator
 - [rsemu](docs/rust/systems-toolchain.md#rsemu): deterministic multi-machine emulator driven by .machine files, 10+ CPU cores, JITs, GDB stub, WASM
 - [algoc](docs/rust/systems-toolchain.md#algoc): transpiler from an algorithm DSL with endian-typed integers to JavaScript and Python
+- [lode](docs/rust/systems-toolchain.md#lode): Lode programming language compiler (Rust/Zig/Go-inspired, proven arithmetic, no runtime, LatticeFoundry back end; early, x86-64 Linux only)
 
 ## Rust: applications & engines
 
@@ -67,6 +70,7 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 - [origami](docs/rust/apps-engines.md#origami): experimental physics-only protein folding CLI (CHARMM36, Langevin and replica-exchange dynamics)
 - [x11anywhere](docs/rust/apps-engines.md#x11anywhere): experimental portable X11 server with Windows, macOS and nested backends
 - [cterm](docs/rust/apps-engines.md#cterm): terminal emulator for AI coding tools; headless `ctermd` gRPC daemon to drive terminal sessions and read the screen
+- [cadlab](docs/rust/apps-engines.md#cadlab): headless electronics CAD for programs and AI agents (one command registry as Rust API, CLI and MCP server; parts/BOM, ERC, placement, autorouter, DRC, Gerber/drill/IPC-2581/STEP)
 
 ## Rust: UI & hardware
 
@@ -79,15 +83,15 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 ## Rust: AI tooling & databases
 
 - [atelier](docs/rust/ai-tools-databases.md#atelier): terminal AI coding agent for OpenAI-compatible APIs with confined tools, MCP client, sessions, headless --print mode
-- [manu](docs/rust/ai-tools-databases.md#manu): stdio MCP server intended to give agents real-world actions (early: only status/ping work)
+- [carl](docs/rust/ai-tools-databases.md#carl): local MCP server giving agents hands (formerly manu): Google account access (Gmail, Calendar, Drive, Slides, Meet), agent-to-agent messaging, self-updating daemon
 - [nixvm](docs/rust/ai-tools-databases.md#nixvm): Linux sandbox with no guest kernel (syscalls handled by its own Rust kernel); run untrusted commands without root or Docker
 - [graphitesql](docs/rust/ai-tools-databases.md#graphitesql): safe, zero-dependency, no_std SQLite reimplementation, file-format compatible, FTS5, WAL, C ABI, WASM
 - [pebbledb](docs/rust/ai-tools-databases.md#pebbledb): Rust port of CockroachDB's Pebble LSM key-value store, binary-compatible on disk
 
 ## Rust: blockchain & wallets
 
-- [tsslib-rs](docs/rust/blockchain.md#tsslib-rs): crate `tsslib`, threshold signatures (FROST, DKLs23 ECDSA, threshold ML-DSA, GG18), wire-compatible with Go tss-lib
-- [outscript-rs](docs/rust/blockchain.md#outscript-rs): crate `outscript`, no_std multi-chain addresses, scripts and tx build/sign (Bitcoin family, PSBT/Taproot, EVM, Solana, Cardano, Zcash)
+- [tsslib-rs](docs/rust/blockchain.md#tsslib-rs): crate `tsslib`, no_std threshold signatures (FROST incl. secp256k1/Taproot, DKLs23 ECDSA, threshold ML-DSA, GG18); read the DKLs23 security caveats
+- [outscript-rs](docs/rust/blockchain.md#outscript-rs): crate `outscript`, no_std multi-chain addresses, scripts and tx build/sign (Bitcoin family, PSBT/Taproot, EVM, Solana, Tron, Cardano, Zcash)
 - [ethrpc-rs](docs/rust/blockchain.md#ethrpc-rs): async EVM JSON-RPC client (Tokio or browser WASM) with ABI eth_call helpers
 - [erigon-seg](docs/rust/blockchain.md#erigon-seg): read, query, write and merge Erigon 3 snapshot files
 - [libwallet](docs/rust/blockchain.md#libwallet): TSS multi-chain wallet backend as C FFI/WASM library with Dart/Flutter client (non-commercial license)
@@ -99,5 +103,5 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 
 - [OxideAV architecture](docs/rust/oxideav.md#architecture): pure-Rust FFmpeg-like media framework: core types, traits and registries, ~130 codec/container/filter crates
 - [oxideav CLI](docs/rust/oxideav.md#cli-oxideav): `oxideav` probe/remux/transcode/convert/run and the `oxideplay` player
-- [Depending on OxideAV](docs/rust/oxideav.md#depending-on-it): oxideav-meta aggregator and individual crates (use git for meta; crates.io 0.0.1 is empty)
-- [Format support](docs/rust/oxideav.md#format-support): per-format decode/encode status for video, audio, image, container and subtitle crates
+- [Depending on OxideAV](docs/rust/oxideav.md#depending-on-it): oxideav-meta aggregator and individual crates (crates.io 0.0.1 is empty; git meta currently needs a [patch.crates-io] workaround)
+- [Format support](docs/rust/oxideav.md#format-support): per-format decode/encode status for video, audio, image, container, subtitle and 3D (STL/OBJ/glTF/USDZ/FBX/IFC/STEP/VRML/X3D) crates, plus CPU/GPU scene renderers

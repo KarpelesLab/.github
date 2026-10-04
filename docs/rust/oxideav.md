@@ -17,7 +17,9 @@ OxideAV (https://github.com/OxideAV, about 149 repos) is a media transcoding and
 | Pixel-format conversion, scaling, palette/dither | `oxideav-pixfmt`, `oxideav-image-filter` |
 | Audio effects/resampling | `oxideav-audio-filter` |
 | Font parsing/shaping/rasterising, SVG/PDF | `oxideav-ttf`/`-otf`/`-scribe`, `oxideav-svg`, `oxideav-pdf`, `oxideav-raster` |
-| 3D assets (STL/OBJ/glTF/USDZ/FBX) | `oxideav-mesh3d` + format crates |
+| 3D assets (STL/OBJ/glTF/USDZ/FBX/VRML/X3D) and CAD/BIM (STEP, IFC) | `oxideav-mesh3d` + format crates ([3D table](#3d-scenes)) |
+| Render a 3D scene to pixels (CPU, or GPU via wgpu) | `oxideav-render`; `oxideav-render-vulkan` for GPU raster/path tracing |
+| Read/write one still-image format without the framework | the format crate alone, `default-features = false` ([still images](#still-images-without-the-framework)) |
 | RTMP ingest/push | `oxideav-rtmp` |
 | Look up format support | [format tables](#format-support) |
 
@@ -77,20 +79,30 @@ Bytes -> ContainerRegistry.probe_input -> Demuxer --Packet--> Decoder --Frame-->
 
 ## Depending on it
 
-crates.io status was checked on 2026-09-28. The code examples below were compiled and run against the crates.io versions shown.
+crates.io status was last checked on 2026-10-04. The code examples below were compiled and run against the crates.io versions shown.
 
 | Approach | Cargo | Notes |
 |---|---|---|
 | **Individual crates (recommended for libraries)** | `oxideav-core = "0.1"` + e.g. `oxideav-flac = "0.0"`, `oxideav-basic = "0.0"`, `oxideav-pipeline = "0.1"`, `oxideav-mkv = "0.0"`, `oxideav-h264 = "0.1"`, `oxideav-png = "0.1"`, `oxideav-pixfmt = "0.1"` | Call each crate's `register(&mut ctx)`. Compiles cleanly against current `oxideav-core 0.1.x`. |
-| **Everything via `oxideav-meta`** | `oxideav-meta = { git = "https://github.com/OxideAV/oxideav-meta", default-features = false, features = ["pure-rust"] }` | The git version wires 91 siblings (131 decoders / 109 encoders / 61 demuxers / 51 muxers with `pure-rust`), and its siblings resolve from crates.io. **Do not use crates.io `oxideav-meta 0.0.1`**: its generated `register_all` is empty, so it registers nothing. |
-| Facade `oxideav` | git/path only | crates.io `oxideav 0.0.3` **fails to compile** against current `oxideav-core` (it calls a removed `RuntimeContext::with_all_features_*`). Not needed: use `oxideav-core` and `oxideav-pipeline` directly. |
+| **Everything via `oxideav-meta`** | `oxideav-meta = { git = "https://github.com/OxideAV/oxideav-meta", default-features = false, features = ["pure-rust"] }` | The git version wires 91+ siblings (131 decoders / 109 encoders / 61 demuxers / 51 muxers with `pure-rust`), and its siblings resolve from crates.io. **Do not use crates.io `oxideav-meta 0.0.1`** (still the latest release): its generated `register_all` is empty, so it registers nothing. **Needs a patch today**, see below. |
+| Facade `oxideav` | git/path only | crates.io `oxideav 0.0.3` (still the latest release) **fails to compile** against `oxideav-core 0.1.37` (E0599: it calls the removed `RuntimeContext::with_all_features_traced` / `_filtered`). Not needed: use `oxideav-core` and `oxideav-pipeline` directly. |
 | `oxideav-io` (one-call open) | `oxideav-io = { version = "0.1", default-features = false, features = ["registry"] }` | Its default `full` feature pulls `oxideav-meta` from crates.io, which is the broken 0.0.1. Use `registry` and pass your own context to the `*_with` functions. |
 | Hacking on the framework | `git clone https://github.com/OxideAV/oxideav-workspace && ./scripts/update-crates.sh && cargo build --workspace` | `update-crates.sh` uses `gh` to clone every sibling into `crates/`, and `[patch.crates-io]` points all `oxideav-*` deps at those local clones. A bare checkout does not build. |
+
+**git `oxideav-meta` does not compile without a patch (checked 2026-10-04).** Any feature set that includes `3d` (so also the default `all` and `pure-rust`) fails with `E0425: cannot find function register_mesh3d in crate oxideav_step`, because crates.io `oxideav-step` is still an empty `0.0.0` name placeholder. Either list the features you need without `3d`/`step`, or point `oxideav-step` at git:
+
+```toml
+[patch.crates-io]
+oxideav-step = { git = "https://github.com/OxideAV/oxideav-step" }
+```
+
+With this patch, `features = ["3d"]` builds (verified; `cargo check` resolves `oxideav-ifc 0.0.3`, `oxideav-render 0.0.5`, `oxideav-vrml 0.0.1` and `oxideav-x3d 0.0.1` from crates.io). Fetching the git dependency may need `CARGO_NET_GIT_FETCH_WITH_CLI=true` if cargo's built-in git client cannot authenticate.
 
 `oxideav-meta` presets:
 - `all` (default)
 - `pure-rust` (`all` minus hwaccel)
 - `audio`, `video`, `image`, `subtitles`, `3d`, `hwaccel`, `source-drivers`
+- `3d` is `mesh3d, stl, obj, gltf, usdz, fbx, ifc, vrml, x3d, step, render`. `oxideav-render-vulkan` is deliberately not in meta.
 - Per-crate features named after the crate's short name (`aac`, `h264`, `mp4`, ...). `oxideav-mod` is `amiga-mod`.
 - `vfw` is opt-in only.
 
@@ -104,13 +116,14 @@ These crates are **not** wired into meta; call their `register` yourself:
 
 Yanked or unpublished (git only): `oxideav-dts`, `-cook`, `-wavpack`, `-lagarith`, `-indeo`, `-aptx`, and the archived `-aiff`.
 
-**Version-skew warning:** each crate is released independently, so crates.io versions can lag each other and git. Some published combinations mismatch at runtime; the CLI tests below turned up a pipeline/mp4 option-name mismatch (`unknown option 'elst_entry_count'`). For the widest format coverage, build from the workspace. For a library, pin exact versions that you have tested together.
+**Version-skew warning:** each crate is released independently, so crates.io versions can lag each other and git. As of 2026-10-04 the latest crates.io releases of core, pipeline, mp4, mkv, aac, h264, png, opus and io all compile together on `oxideav-core 0.1.37`, but some combinations still fail at runtime: with `oxideav-mp4 0.0.10` + `oxideav-aac 0.1.7`, every AAC packet from an MP4 is rejected with `packet has neither an ADTS nor a LOAS syncword` (H.264 from the same file decodes). For the widest format coverage, build from the workspace. For a library, pin exact versions that you have tested together.
 
 ## CLI: `oxideav`
 
 **Install:**
-- Prebuilt tarballs are on https://github.com/OxideAV/oxideav-workspace/releases (latest `v0.0.5`, 2026-05-27, for linux-x86_64, macos-universal and windows-x86_64). They bundle `oxideav` and `oxideplay`. The release is older than the code: it lacks e.g. an AAC decoder.
+- Prebuilt tarballs are on https://github.com/OxideAV/oxideav-workspace/releases (latest is still `v0.0.5`, 2026-05-27, for linux-x86_64, macos-universal and windows-x86_64). They bundle `oxideav` and `oxideplay`. The release is much older than the code: it lacks e.g. an AAC decoder.
 - Otherwise build it: `cargo build --release -p oxideav-cli` in the workspace. The crate has `publish = false`, so there is no `cargo install`.
+- The engine behind `oxideav convert` is published separately as `oxideav-cli-convert` (crates.io `0.0.7`), which now takes `-threads N`.
 
 Global flags: `--no-hwaccel`, `--debug`, `--debug-output FILE` and `--buffer-mib N` (prefetch buffer size in MiB). Inputs can be paths or `file://`, `http(s)://` or `rtmp://` URIs.
 
@@ -125,7 +138,7 @@ Global flags: `--no-hwaccel`, `--debug`, `--debug-output FILE` and `--buffer-mib
 | `run <job.json \| -> [--inline JSON] [--threads N]`, `validate`, `dry-run` | JSON job graph |
 | `bench <codec> [--all]` | encode/decode throughput per backend |
 
-The following commands were checked against a workspace build at tip (2026-09-28):
+The following commands were checked against a workspace build at tip (2026-09-28; the failures listed under gotchas were re-tested at `d02173e`, 2026-10-04):
 
 ```sh
 oxideav probe in.mp4                                     # Format: mp4, per-stream codec/size/rate/duration
@@ -153,19 +166,21 @@ Filter names:
 
 ### CLI gotchas
 
-These were observed at tip on 2026-09-28. Re-test before relying on any of them.
-- **Extracting frames to images does not work from the CLI today:**
-  - `convert movie.mp4 frame-%03d.png` is refused, because `%d` templates only apply to PDF inputs.
-  - A `run` job writing `out.png` from a video fails with "PNG muxer: no packets written" (MKV input) or `unknown option 'elst_entry_count'` (MP4 input).
-  - `transcode ... --codec-video png` panics.
-  - Use the [library route](#extract-frames-to-png) instead.
-- AAC inside MP4/MKV fails to decode in `transcode` ("packet has neither an ADTS nor a LOAS syncword"), so `--codec-audio X` on a typical h264+aac MP4 fails. Remux (copy) of the same file works.
-- Encoding AAC into MP4 fails ("aac stream missing extradata").
-- Other encoders reject inputs:
-  - The Opus encoder only accepts 48 kHz; resample first.
-  - The VP9 encoder needs `pixel_format` set.
-  - No `.mp3` muxer is registered for output.
-- WAV output accepts exactly one audio stream. Drop the video by using a job with only an `audio` track.
+Re-tested at workspace tip `d02173e` (2026-10-04) with small ffmpeg-generated files. Re-test before relying on any of them.
+- **Extracting frames from video to images does not work from the CLI.** It now fails with an error instead of silently writing nothing:
+  - `transcode in.mp4 frame-%03d.png` fails with `PNG muxer: codec_id must be png (got h264)` (or `ffv1`/`mjpeg`).
+  - `convert in.mp4 frame-%d.png` fails with "does not declare the pixel layout of video stream #0"; a single `out.png` fails with `PNG encoder: stride 160 is shorter than the 640-byte row`.
+  - `transcode ... --codec-video png` into `.mkv` no longer panics, but fails with the same stride error.
+  - Use the [library route](#extract-frames-to-png) instead; it works.
+- **H.264 input can decode zero frames in the CLI.** A 160x120 baseline H.264 file reported "10 pkts in, 0 frames decoded" when transcoded with `--codec-video png` or `ffv1`, although the same file decodes through the crates directly.
+- **AAC inside MP4/MKV does not decode** (`.m4a`, `.mka`, `.mp4`, `.mkv` → wav/flac): `oxideav-aac: packet has neither an ADTS nor a LOAS syncword`. So `--codec-audio X` on a typical h264+aac MP4 fails. Remux (copy) of the same file works.
+- **Encoding AAC into MP4/M4A fails:** `mp4 muxer: aac stream missing extradata (AudioSpecificConfig)`.
+- **Other encoders reject inputs:**
+  - Opus only accepts 48 kHz: `unsupported input sample rate 44100 Hz (48000 required)`; resample first (see the `run` example above).
+  - VP9 into `.mkv`/`.webm` fails with `vp9 encoder: pixel_format is required`.
+  - There is no MP3 output: `transcode in.wav out.mp3` fails with `format not found: mp3`, with or without `--codec-audio mp3`.
+- **WAV output accepts exactly one audio stream,** and an A/V input is refused ("WAV supports exactly one audio stream") rather than having its video dropped. Use a `run` job with only an `audio` track.
+- `generate://testsrc` is rejected by `transcode`/`probe`; use it from an `oxideav run` JSON job.
 
 ## Player: `oxideplay`
 
@@ -175,10 +190,11 @@ These were observed at tip on 2026-09-28. Re-test before relying on any of them.
   - `--vo winit` uses winit+wgpu and adds an egui overlay.
 - Audio goes through `oxideav-sysaudio`, which runtime-loads ALSA, PulseAudio, WASAPI, CoreAudio or OSS.
 - Keys: `q` quit, `space` pause, `←/→` ±10 s, `↑/↓` ±1 min, `PgUp/PgDn` ±10 min, `*` and `/` for volume.
+- 3D model viewer (new in git, not in the v0.0.5 release): opening a 3D file shows it interactively. Built with the `viewer-gpu` feature (winit output) it draws on the GPU through `oxideav-render-vulkan`; otherwise it uses the `oxideav-render` software backends, including the path tracer.
 
 ## Library usage
 
-All three examples below compiled and ran against crates.io `oxideav-core 0.1.37`, `oxideav-flac 0.0.11`, `oxideav-basic 0.0.10`, `oxideav-pipeline 0.1.12`, `oxideav-source 0.1.5`, `oxideav-mkv 0.0.10`, `oxideav-h264 0.1.8`, `oxideav-png 0.1.8` and `oxideav-pixfmt 0.1.8`.
+The examples below compiled and ran against crates.io `oxideav-core 0.1.37`, `oxideav-flac 0.0.11`, `oxideav-basic 0.0.10`, `oxideav-pipeline 0.1.12`, `oxideav-source 0.1.5`, `oxideav-mkv 0.0.10` and `oxideav-h264 0.1.8`. The frame-extraction and still-image examples were re-verified on 2026-10-04 with `oxideav-png 0.1.11` and `oxideav-pixfmt 0.1.9`.
 
 ### Encode PCM, mux, probe, demux, decode (FLAC)
 
@@ -289,7 +305,7 @@ println!("{} packets read, {} frames decoded", st.packets_read, st.frames_decode
 
 ### Extract frames to PNG
 
-This decodes H.264 from MKV, converts each frame to RGBA and encodes one PNG per frame.
+This decodes H.264 from MKV, converts each frame to RGBA and encodes one PNG per frame through the codec registry. Build it with `--release`: on a 5-frame 160x120 clip the release build finished instantly, while an unoptimised debug build had not finished after 5 minutes.
 
 ```rust
 use oxideav_core::{CodecId, CodecParameters, Error, Frame, PixelFormat, ReadSeek, RuntimeContext};
@@ -346,6 +362,24 @@ fn main() -> oxideav_core::Result<()> {
 }
 ```
 
+### Still images without the framework
+
+Since 2026-10-03 every image crate (`oxideav-png`, `-mjpeg`, `-webp`, `-gif`, `-bmp`, `-tiff`, `-heif`, `-avif`, `-qoi`, `-tga`, ...) follows one API contract (`IMAGE_CRATE_API.md` in oxideav-workspace). The same root functions exist in each crate and work with `default-features = false`, without `oxideav-core`: `probe`, `info`, `decode` (native layout), `decode_rgb8` / `decode_rgba8`, `decode_all` (animation frames), `encode`, `encode_rgb8` / `encode_rgba8`, `encode_to`, and an `EncodeOptions` builder. Older per-format names such as `decode_png_to_rgba` or `encode_png_image` are deprecated aliases. Releases on the new contract include `oxideav-png 0.1.11`, `oxideav-bmp 0.1.7` and `oxideav-webp 0.3.0`. A framework-side gateway crate, `oxideav-image`, is described in the contract but does not exist yet.
+
+```rust
+// oxideav-png = { version = "0.1.11", default-features = false }
+let bytes = std::fs::read("in.png")?;
+if oxideav_png::probe(&bytes) {
+    let info = oxideav_png::info(&bytes)?;            // header only: width, height, format, frames
+    let img = oxideav_png::decode(&bytes)?;           // PngImage, native layout
+    let rgba: Vec<u8> = img.to_rgba8();               // tightly packed, 4 * width bytes per row
+    let (w, h) = (img.width(), img.height());
+    let opts = oxideav_png::EncodeOptions::default().with_level(2);
+    let out: Vec<u8> = oxideav_png::encode_rgba8(w, h, &rgba, &opts)?;
+    std::fs::write("out.png", out)?;
+}
+```
+
 ### `oxideav-io`: one-call open/probe
 
 Taken from the `oxideav-io` README; this was not compiled here. The API is `open(path) -> Opened::{Image(RgbaImage{width,height,pixels,stride}), Vector, Scene, Mesh, Media(MediaReader)}`, together with `open_rgba`, `open_rgb`, `open_media`, `ping_format` (reads at most 257 KiB), `probe(path) -> Probe { kind, container, duration_secs, metadata, streams }`, `save(&opened, "out.jpg")` and `transcode_with`. Each has a `*_with(&ctx, Source::Path/Uri/Bytes/Reader, &OpenOptions)` variant. `OpenOptions` can allow or deny containers and codecs, which is useful for sandboxing untrusted input. With crates.io, use `default-features = false, features = ["registry"]` and the `*_with` functions. The zero-config variants depend on `oxideav-meta`.
@@ -368,14 +402,14 @@ oxideav_core::register!("mycodec", register); // must be reachable at the crate 
 ```
 
 **Library gotchas:**
-- Per-crate README snippets are sometimes stale. Some call `codecs.make_decoder(...)` or `containers.open(...)`, which are **not** methods on the current core registries. Use `first_decoder` / `first_encoder` / `open_demuxer`, or the free functions `oxideav_pipeline::make_decoder(&reg, &params)`. Each codec crate also exposes its own `decoder::make_decoder(&params)`.
+- Per-crate README snippets are often stale: as of 2026-10-04, 68 per-crate READMEs still call `codecs.make_decoder(...)` or `containers.open(...)`, which are **not** methods on the current core registries. Use `CodecRegistry::first_decoder` / `first_encoder` and `ContainerRegistry::open_demuxer`. `make_decoder` only exists as the free function `oxideav_pipeline::make_decoder(&reg, &params)` and as each codec crate's own `decoder::make_decoder(&params)` factory.
 - When a hardware bridge also claims a codec id, `first_decoder` may choose it. Pin the software implementation with `decoder_by_impl("<id>_sw", &params)`, or use `CodecPreferences { no_hardware: true, .. }`.
 - The PCM codec ids are `pcm_s16le`, `pcm_f32le`, etc. (from `oxideav-basic`). FLAC decode outputs `U8`, `S16`, `S24` or `S32` depending on the stream's bit depth.
 - Repository descriptions on GitHub are often outdated. For example, "H.264 decoder: I-slice only" is wrong; H.264 now decodes and encodes. The workspace README's status tables are the current source, and `oxideav list` / `oxideav info <codec>` are authoritative for any given build.
 
 ## Format support
 
-The status column is condensed from the oxideav-workspace README current-status tables (2026-09-28). ✅ means working end-to-end, with a percentage where the README gives one. 🚧 means partial or scaffold. — means not implemented. "crates.io" is the latest published version; "git" means yanked or unpublished. "meta" is the feature name in `oxideav-meta` (✗ means you must register the crate manually).
+The status column is condensed from the oxideav-workspace README current-status tables (2026-09-28); crates.io versions were refreshed on 2026-10-04 for the crates that had new releases. ✅ means working end-to-end, with a percentage where the README gives one. 🚧 means partial or scaffold. — means not implemented. "crates.io" is the latest published version; "git" means yanked or unpublished. "meta" is the feature name in `oxideav-meta` (✗ means you must register the crate manually).
 
 ### Containers
 
@@ -436,9 +470,9 @@ MP3, FLAC, GIF, PNG, WebP, TIFF, JPEG, BMP, ICO and the trackers also ship their
 | Crate | Codec | Decode | Encode | crates.io | meta |
 |---|---|---|---|---|---|
 | oxideav-h264 | H.264/AVC | ✅ ~97% | ✅ ~98% | 0.1.8 | h264 |
-| oxideav-h265 | H.265/HEVC | ✅ ~99% | 🟢 ~90% | 0.0.12 | h265 |
+| oxideav-h265 | H.265/HEVC | ✅ ~99% | 🟢 ~90% | 0.0.14 | h265 |
 | oxideav-h266 | H.266/VVC | ✅ 100% | 🚧 ~95% | 0.0.9 | h266 |
-| oxideav-av1 | AV1 | ✅ 100% | 🟢 ~99% | 0.1.19 | av1 |
+| oxideav-av1 | AV1 | ✅ 100% | 🟢 ~99% | 0.1.20 | av1 |
 | oxideav-vp8 / -vp9 | VP8 / VP9 | ✅ 100% / ~97% | ✅ 100% / ~99% | 0.2.7 / 0.0.13 | vp8/vp9 |
 | oxideav-vp6 | VP6 (vp6f/vp6a) | 🚧 ~92% | 🚧 ~70% | 0.0.9 | vp6 |
 | oxideav-evc | MPEG-5 EVC | 🟢 ~90% | 🟢 ~88% | 0.0.4 | ✗ |
@@ -467,12 +501,12 @@ All image crates decode and encode unless noted.
 
 | Crate | Format | Status | crates.io | meta |
 |---|---|---|---|---|
-| oxideav-png | PNG + APNG | ✅ 100% | 0.1.8 | png |
+| oxideav-png | PNG + APNG | ✅ 100% | 0.1.11 | png |
 | oxideav-gif | GIF 87a/89a + animation | ✅ 100% | 0.0.11 | gif |
-| oxideav-webp | WebP lossy/lossless/animated | ✅ 100% | 0.2.3 | webp |
+| oxideav-webp | WebP lossy/lossless/animated | ✅ 100% | 0.3.0 | webp |
 | oxideav-mjpeg | JPEG (baseline/progressive/hierarchical) | ✅ ~95% dec / ~90% enc | 0.1.9 | mjpeg |
 | oxideav-tiff | TIFF 6.0 + BigTIFF, CCITT, JPEG-in-TIFF | ✅ 100% / ~97% | 0.0.6 | ✗ |
-| oxideav-bmp / -ico | BMP / ICO, CUR, ANI | ✅ ~97–98% | 0.1.6 / 0.0.7 | ✗ |
+| oxideav-bmp / -ico | BMP / ICO, CUR, ANI | ✅ ~97–98% | 0.1.7 / 0.0.7 | ✗ |
 | oxideav-jpeg2000 | JPEG 2000 Part 1 + HTJ2K | ✅ ~98% | 0.0.16 | jpeg2000 |
 | oxideav-jpegxl | JPEG XL | ✅ ~99% decode, encode retired | 0.0.13 | jpegxl |
 | oxideav-jpegxs | JPEG XS | ✅ 100% | 0.0.7 | jpegxs |
@@ -498,7 +532,23 @@ All image crates decode and encode unless noted.
 
 ### 3D scenes
 
-These crates use `oxideav-mesh3d`'s `Mesh3DRegistry` rather than the codec registry. Populate it with `oxideav_meta::populate_mesh3d_registry`.
+These crates use `oxideav-mesh3d`'s `Mesh3DRegistry` rather than the codec registry. Populate it with `oxideav_meta::populate_mesh3d_registry` (meta features `stl`, `obj`, `gltf`, `usdz`, `fbx`, `ifc`, `vrml`, `x3d`, `step`, all in the `3d` preset), or call each crate's `register` (`register_mesh3d` for `oxideav-ifc` and `oxideav-step`). `oxideav-step` is git-only: crates.io `0.0.0` is an empty placeholder, so use the `[patch.crates-io]` entry from [Depending on it](#depending-on-it). `oxideav-step`, `-vrml` and `-x3d` also build without `oxideav-core` when you set `default-features = false`; `oxideav-step` then exposes only `read_step` and `StepModel`.
+
+`oxideav-render-vulkan` (MSRV 1.87, wgpu 29) is not wired into meta. `GpuRenderer::new()` returns `Error::Backend` when there is no usable GPU adapter, so fall back to `oxideav-render`. `register_into(&mut RenderRegistry)` adds the backends `"gpu"` and `"gpu-pathtrace"`.
+
+```rust
+// STEP, std-only model (works with default-features = false)
+let bytes = std::fs::read("part.stp")?;
+let model = oxideav_step::read_step(&bytes)?;
+for part in &model.parts { println!("{:?}: {} shapes", part.name, part.shapes.len()); }
+
+// Any of the three through the registry (default `registry` feature)
+let mut reg = oxideav_mesh3d::Mesh3DRegistry::new();
+oxideav_step::register_mesh3d(&mut reg);
+oxideav_vrml::register(&mut reg);
+oxideav_x3d::register(&mut reg);
+let scene = reg.decoder_for_extension("stp").unwrap().decode(&bytes)?;
+```
 
 | Crate | Format | Decode | Encode | crates.io |
 |---|---|---|---|---|
@@ -507,14 +557,18 @@ These crates use `oxideav-mesh3d`'s `Mesh3DRegistry` rather than the codec regis
 | oxideav-gltf | glTF 2.0 / .glb | ✅ ~98% | ✅ ~95% | 0.0.4 |
 | oxideav-usdz | USDZ/USDA | ✅ ~97% | ✅ ~92% | 0.0.4 |
 | oxideav-fbx | FBX | 🚧 ~95% | ✅ ~95% | 0.0.3 |
-| oxideav-ifc | IFC (BIM, STEP) | ✅ | — | 0.0.2 |
-| oxideav-render | Scene3D → raster (scanline/raycast) | 🚧 | | 0.0.4 |
+| oxideav-ifc | IFC (BIM, STEP) | ✅ | — | 0.0.3 |
+| oxideav-step | STEP CAD (ISO 10303-21; AP242/AP214/AP203 B-rep + AP242 tessellated), `.step`/`.stp`/`.p21` | ✅ | ✅ AP242 tessellated only | git (0.0.0 is a placeholder) |
+| oxideav-vrml | VRML97 (ISO/IEC 14772), `.wrl`/`.wrz` | ✅ | ✅ | 0.0.1 |
+| oxideav-x3d | X3D 4.0 (ISO/IEC 19775-1): XML `.x3d`/`.x3dz`, ClassicVRML `.x3dv`/`.x3dvz`, JSON `.x3dj` | ✅ | ✅ (no JSON write) | 0.0.1 |
+| oxideav-render | Scene3D → raster (scanline / Whitted raycast / path tracer) | ✅ | | 0.0.5 |
+| oxideav-render-vulkan | Scene3D → raster on the GPU via wgpu (Vulkan/Metal/DX12/GL, loaded at runtime): PBR rasteriser + path tracer | ✅ | | 0.0.1 |
 
 ### Filters, conversion, text, sources, output
 
 | Crate | Role | Status | crates.io | meta |
 |---|---|---|---|---|
-| oxideav-pixfmt | 70 pixel formats, full conversion matrix, palette generation, dithering (`convert(&frame, FrameInfo, dst, &ConvertOptions)`) | ✅ | 0.1.8 | (dependency) |
+| oxideav-pixfmt | 70 pixel formats, full conversion matrix, palette generation, dithering (`convert(&frame, FrameInfo, dst, &ConvertOptions)`) | ✅ | 0.1.9 | (dependency) |
 | oxideav-image-filter | 136 filter types (resize, blur, edge, crop, rotate, ...), JSON names `video.*` | ✅ | 0.1.2 | image-filter |
 | oxideav-audio-filter | about 50 filters (volume, resample, echo, EQ, compressor, reverb, loudness, spectrogram, ...) | ✅ | 0.1.2 | audio-filter |
 | oxideav-source | `SourceRegistry` drivers: file, mem, data:, slice, concat; `BufferedSource` prefetch | ✅ | 0.1.5 | source |
@@ -524,10 +578,10 @@ These crates use `oxideav-mesh3d`'s `Mesh3DRegistry` rather than the codec regis
 | oxideav-sysaudio | native audio output (ALSA/Pulse/WASAPI/CoreAudio/OSS, runtime-loaded) | ✅ | 0.1.1 | ✗ |
 | oxideav-ttf / -otf / -scribe / -raster | TrueType/OpenType parsing, shaping (GSUB/GPOS, bidi), vector→raster | ✅ | 0.1.8 / 0.1.4 / 0.1.10 / 0.1.3 | ✗ |
 | oxideav-scene | time-based scene model (PDF pages, compositor, NLE) | 🚧 | 0.1.4 | ✗ |
-| oxideav-mesh3d | typed Scene3D model + registry | ✅ | 0.0.6 | mesh3d |
+| oxideav-mesh3d | typed Scene3D model + registry | ✅ | 0.0.7 | mesh3d |
 | oxideav-bitstream | H.264/HEVC/AV1 header parse helpers for HW bridges | ✅ | 0.0.2 | ✗ |
 | oxideav-io | open/probe/save/transcode facade | ✅ still images; A/V transcode pending | 0.1.0 | ✗ |
-| oxideav-cli-convert | engine behind `oxideav convert` | ✅ | 0.0.5 | ✗ |
+| oxideav-cli-convert | engine behind `oxideav convert` (`-threads N`) | ✅ | 0.0.7 | ✗ |
 | oxideav-videotoolbox / -audiotoolbox | macOS hardware decode/encode | 🚧 | 0.0.3 | hwaccel |
 | oxideav-vaapi / -vdpau / -nvidia / -vulkan-video | Linux (+Windows for Vulkan) hardware decode/encode | 🚧 | 0.0.2–0.0.3 | hwaccel |
 

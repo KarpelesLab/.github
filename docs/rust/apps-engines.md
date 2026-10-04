@@ -1,6 +1,6 @@
 # Applications & Engines
 
-End-user programs and large language/runtime engines built on top of the KarpelesLab pure-Rust foundation crates (`purecrypto`, `rsurl`, `compcol`, `puremp`, `z3rs`, `oxideav`, `puressh`). Several of them are layered: `argus` (web browser) runs page scripts in `kataan` (JavaScript engine) and fetches over `rsurl`; `puregit` and `cterm` reuse `rsurl`/`puressh`; `mathesis` is a WASM front end to `puremp` + `z3rs`. Most are applications first, but `kataan`, `fstool`, `puregit`, `mathesis`, and `cterm-core` are also usable as library crates. Maturity varies widely, from production-grade (`fstool`, `kataan`) to experimental (`argus`, `origami`, `goro-rs`).
+End-user programs and large language/runtime engines built on top of the KarpelesLab pure-Rust foundation crates (`purecrypto`, `rsurl`, `compcol`, `puremp`, `z3rs`, `oxideav`, `puressh`). Several of them are layered: `argus` (web browser) runs page scripts in `kataan` (JavaScript engine) and fetches over `rsurl`; `puregit` and `cterm` reuse `rsurl`/`puressh`; `mathesis` is a WASM front end to `puremp` + `z3rs`; `cadlab` (headless electronics CAD for agents) builds on `polyclip` and, optionally, the OxideAV 3D crates. Most are applications first, but `kataan`, `fstool`, `puregit`, `mathesis`, `cadlab`, and `cterm-core` are also usable as library crates. Maturity varies widely, from production-grade (`fstool`, `kataan`) to experimental (`argus`, `origami`, `goro-rs`).
 
 ## Quick pick
 
@@ -16,6 +16,7 @@ End-user programs and large language/runtime engines built on top of the Karpele
 | Exact arithmetic, number theory, polynomial derivatives, small SMT queries with Wolfram-like syntax | [`mathesis`](#mathesis) |
 | Drive terminal sessions programmatically (spawn a PTY, send keys, read the screen as text) over gRPC | [`cterm`](#cterm) |
 | Parse VT100/ANSI output into a screen grid in Rust | [`cterm`](#cterm) (`cterm-core`) |
+| Headless PCB/EDA driven by CLI, Rust or MCP: circuit, ERC, autoroute, DRC, Gerber/IPC-2581 | [`cadlab`](#cadlab) |
 | Physics-based protein structure building, minimization, Langevin/REMD dynamics, PDB output | [`origami`](#origami) |
 | X11 server that forwards to macOS/Windows/X11 displays | [`x11anywhere`](#x11anywhere) |
 
@@ -114,7 +115,8 @@ let (console, value) = kataan::nbvm::execute("console.log('hi'); 6 * 7").unwrap(
 ```
 
 **Gotchas:**
-- The README shows `kataan::interp::Interp` and `.to_js_string()`, which do not exist. Use `kataan::Interp` (re-export of `nbexec::Interp`) and `interp.display(value)`.
+- `interp.display(value)` and `interp.realm().to_display_string(value)` both stringify a value (the README uses the latter).
+- crates.io `0.0.9` (2026-09-05) lags master, which has since moved more of the language (ES modules, `using`, optional/super calls) onto the register bytecode VM (`nbvm`). Use a git dependency for the latest behaviour.
 - `Ctx` also has `new_object`, `set`, `get`, `call`, `construct`, `new_array`, `type_error`, `set_native_state`/`native_state`, `deferred` (promises). Install host globals with `kataan::host::install_all(&mut interp)`, then call `kataan::host::timers::run_event_loop`.
 - Resource caps are set in `kataan::Limits` (`Interp::new_with_limits`, `nbvm::execute_with_limits`). There is no JS step budget. Stop runaway scripts with the `kataan::interrupt` watchdog (`nbvm::execute_typed_interruptible`).
 
@@ -277,9 +279,116 @@ std::fs::write("sd.img", ws.export()?)?;
 ```
 Also `fstool::memconv::probe(&[u8])` (reports compression, partition table, and FS kind) and the low-level `fstool::block::FileBackend` + `fstool::fs::ext::Ext::format_with` (see `examples/format_empty_ext2.rs`).
 
+## cadlab
+
+**Repo:** https://github.com/KarpelesLab/cadlab · **Crate:** `cadlab` (crates.io `0.0.1`; library plus `cadlab` binary) · **License:** MIT · **Status:** pre-alpha by version number, but broad in practice. Roadmap milestones M0–M5, M8 and M9 are done, and most of M6/M7. The README "Status" paragraph is stale: it says only `project.*` exists, but there are 149 commands. MSRV 1.89.
+
+Headless electronics CAD (EDA), built to be **driven by programs and AI agents**. It covers parts and BOM, circuit (netlist-first), ERC, auto-generated schematic, board, placement, autorouting, DRC, and fab outputs, with no GUI. The only visual output is rendering (PNG/SVG, isometric 3D). Every operation is a typed, JSON-Schema-described command in one **command registry**. The Rust library, the CLI and the MCP server are thin layers over that registry, so names, arguments, validation and errors are identical on all three. Coordinates are integer nanometres, and output is deterministic byte for byte (the router is seeded). Polygon geometry comes from [`polyclip`](i18n-math.md#polyclip). The code is clean-room: KiCad and freerouting are used only as external test oracles, never as code sources.
+
+**Use it when:** an agent or script has to produce a manufacturable PCB end to end, or one stage of it (ERC, autoroute, DRC, Gerber/IPC-2581 export, fab-rule checks, BOM costing), without driving a GUI. It also fits when you need to import KiCad boards or netlists into a scriptable pipeline.
+**Don't use it when / limits:**
+- You need interactive editing, or KiCad-grade completeness for schematic capture. There is no `.kicad_sch` import: circuits come in as netlists, and schematics are always derived.
+- `.kicad_sym`/`.kicad_mod` library import is not done yet.
+- The router is a grid A* router with negotiated congestion, shove, fanout and gridless refinement. Its stated goal is parity with freerouting, which is still in progress.
+- ODB++ is intentionally not implemented (licence terms). Use IPC-2581.
+
+**Install / run:**
+```sh
+cargo install cadlab            # or prebuilt binaries: GitHub release v0.0.1 (linux x86_64/aarch64, macOS universal, Windows)
+claude mcp add cadlab -- cadlab mcp      # register as an MCP server (stdio)
+```
+
+**CLI shape:** `cadlab [-p DIR] [--json] [--dry-run] [-q] <group> <action> [ARGS]`. The project is the `-p` directory, or the first `cadlab.toml` found walking up from the current directory. Positional arguments come from the schema (`cadlab describe <cmd>` shows the `cli:` line), and every other argument is a `--flag`. Lengths **must carry units** (`"0.2mm"`, `"8mil"`). Verified session:
+```sh
+cadlab project new led --targets jlcpcb && cd led
+cadlab circuit add "R 1k 1% 0603"                       # generic part -> R1 (symbol + IPC-7351B footprint generated)
+cadlab circuit add "LED red 0603"                       # -> D1 (pins K, A)
+cadlab part create --category connector --id HDR2 --package "PinHeader 1x02" \
+  --pins '[{"number":"1","name":"VCC","kind":"power_out"},{"number":"2","name":"GND","kind":"power_out"}]'
+cadlab circuit add HDR2                                 # -> J1
+cadlab net connect VCC J1.VCC R1.1                      # pins by name or number; ranges U1.PA0..PA7, buses DATA[0..7]
+cadlab net connect LED_A R1.2 D1.A
+cadlab net connect GND D1.K J1.GND
+cadlab circuit erc                                      # "ERC clean"
+cadlab circuit summary                                  # compact text netlist, made for LLM context
+cadlab board outline --width 20mm --height 15mm
+cadlab place auto
+cadlab route all                                        # "routed 3/3 connections (100%)"
+cadlab drc run                                          # exit 3 if errors
+cadlab render board top.png --realistic top             # PNG or SVG
+cadlab fab check jlcpcb
+cadlab fab export jlcpcb                                # out/fab/jlcpcb/: Gerbers, drill, BOM, CPL, zip, fab-lock.json
+cadlab export all                                       # generic Gerber X2/X3, drill, PnP, IPC-D-356A, IPC-2581
+cadlab undo                                             # history persists in .cadlab/ across processes
+```
+These generic entry points work on every command:
+- `cadlab describe [cmd|group]` prints the argument and output schema.
+- `cadlab call net.connect '{"net":"VCC","pins":["J1.1"]}'` runs any command with JSON arguments (`-` reads them from stdin).
+- `cadlab batch steps.jsonl` runs one `{"cmd":..,"args":{..}}` per line as a single all-or-nothing transaction and a single undo step.
+- `cadlab history`, `undo` and `redo` manage the undo history.
+
+`--json` prints exactly one object: `{"ok":true,"command","output","diagnostics"}` or `{"ok":false,"error":{"kind","code","message","subjects","hint"}}`. The `hint` field carries "did you mean" suggestions. Exit codes: `0` ok, `1` command error, `2` usage, `3` completed with ERC/DRC/check errors.
+
+**Command groups** (149 commands; run `cadlab describe` for the full list):
+- Project and library: `project`, `part` (`generic`, `create`, `search`), `footprint` (IPC-7351B `generate`, 3D `model_set`), `lib` (shared user libraries), `catalog`.
+- Circuit: `circuit` (`add`, `erc`, `lint`, `summary`, `export`, `import` from a KiCad netlist), `net`, `netclass`, `diffpair`, `lengthgroup`, `block` (reusable sub-circuits).
+- Sourcing: `bom` (`resolve`, `check`, `cost`, `substitutes`, `export`).
+- Board: `board` (`setup`, `outline`, `rules`, `stackup`, `hole`, `cutout`, `import_kicad`, `export_kicad`), `place` (`auto`, `near`, `align`, ...), `track`, `via`, `zone`, `keepout`, `impedance`, `current`.
+- Routing and checks: `route` (`all`, `nets`, `fanout`, `diffpair`, `tune`, `import_ses`), `drc`.
+- Output: `render` (`schematic`, `board`, `board3d`, `footprint`, `symbol`), `schematic` (`export` to `.kicad_sch`).
+- Export: `export` (`gerber`, `drill`, `pnp`, `ipc356`, `ipc2581`, `step`, `idf`, `idx`, `dsn`, `spice`, `all`).
+- Fab: `fab` (`list`, `check`, `compare`, `export`, `substitute`).
+- Built-in fab profiles: jlcpcb, pcbway, oshpark, aisler, eurocircuits, seeed, nextpcb, pcbgogo, allpcb, elecrow, generic. You can add your own in `~/.config/cadlab/fab-profiles`.
+
+**MCP server** (`cadlab mcp`, stdio, newline-delimited JSON-RPC, no async runtime):
+- **Tools:** one tool per group (`project`, `circuit`, `route`, ...) with `{action, args, project?, dry_run?}`, plus `describe`, `call` (`{command, args}`) and `batch` (`{steps:[{cmd,args}]}`). Each group tool's description lists its actions and argument signatures.
+- **Session:** start with `project` `new` or `open`. Later calls act on the current project unless `project` names another directory. Several projects can be open at once. Changes autosave; with `--no-autosave` they wait for `project.save`.
+- **Results:** a text summary plus `structuredContent`. `render.*` results also include the PNG as MCP **image content**, so multimodal agents can look at the board. Long commands (route, part search) send progress notifications and honour `notifications/cancelled`.
+- The server implements tools only. `docs/INTERFACES.md` describes MCP resources and prompts, but they are not implemented.
+
+**Library:**
+```toml
+[dependencies]
+cadlab = { version = "0.0.1", default-features = false }   # drop CLI/network/PNG/rayon/3D-model deps
+serde_json = "1"
+```
+```rust
+use cadlab::prelude::*;
+use cadlab::commands::project;
+use serde_json::json;
+
+let dir = std::env::temp_dir().join("cadlab-demo");
+let mut s = Session::new();
+run(&mut s, project::New { path: dir, name: Some("demo".into()), description: None, targets: vec![] },
+    RunOptions::default())?;                                   // typed command
+for (cmd, args) in [
+    ("circuit.add", json!({"part": "R 1k 1% 0603"})),
+    ("circuit.add", json!({"part": "LED red 0603"})),
+    ("net.connect", json!({"net": "LED_A", "pins": ["R1.2", "D1.A"]})),
+    ("board.outline", json!({"width": "20mm", "height": "15mm"})),
+    ("place.auto", json!({})),
+    ("route.all", json!({"seed": 0})),
+    ("drc.run", json!({})),
+] {
+    let out = registry().execute(&mut s, cmd, args, RunOptions::default())  // by name, same as CLI/MCP
+        .map_err(|f| f.error)?;
+    println!("{}: {}", out.command, out.summary);              // out.output = structured JSON
+}
+s.save()?;
+```
+
+**Cargo features:** the defaults are `cli` (clap and rpassword, needed for the binary), `net` (ureq for the DigiKey, Mouser and Nexar supplier APIs), `png` (tiny-skia; SVG needs no feature), `parallel` (rayon plus `polyclip/rayon`) and `models3d` (STL/OBJ/glTF/USDZ import through `oxideav-mesh3d`).
+
+**Gotchas:**
+- `docs/INTERFACES.md` shows the *target* CLI, and some of its examples do not run. `cadlab erc` is really `cadlab circuit erc`, `board outline rect 50mm 30mm` is `board outline --width 50mm --height 30mm`, and `route --all` is `route all`. The `p.bom().add(..)` wrapper API in that file does not exist yet; use `run` or `Registry::execute`. Trust `cadlab describe`.
+- Part IDs in the library use underscores (`LED_red_0603`). Mistyped names fail with a hint such as ``did you mean `LED_red_0603`?``.
+- Supplier research (`part.search`, `bom.resolve/check/cost`, `fab check --parts`) needs providers. Configure them with `cadlab config digikey|mouser|nexar`, with environment variables (`DIGIKEY_CLIENT_ID`/`_SECRET`, `MOUSER_API_KEY`, `NEXAR_CLIENT_ID`/`_SECRET`), or with offline JSON catalogs (`CADLAB_CATALOGS`, `~/.config/cadlab/catalogs/*.json`, `catalog.import` for a JLCPCB/LCSC CSV). `CADLAB_OFFLINE=1` serves only cached answers. Credentials are never stored in the project.
+- A project is a git-friendly directory: `cadlab.toml`, `circuit.json`, `board.json`, `bom.json` and `library/`. `.cadlab/` holds caches and undo history, and `out/` holds generated files. Fab-specific choices go only in `out/fab/<fab>/fab-lock.json`.
+- cadlab depends on `polyclip = "0.0.2"`, an exact pin under 0.0.x rules, while polyclip itself is at `0.0.4`.
+
 ## origami
 
-**Repo:** https://github.com/KarpelesLab/origami · **Crate:** `origami` binary from workspace crates `chem`, `translate`, `geom`, `energy`, `dynamics`, `io`, `gpu`, `cli` (git only) · **License:** MIT (CHARMM36 data files under their own academic terms) · **Status:** experimental research code
+**Repo:** https://github.com/KarpelesLab/origami · **Crate:** `origami` binary from workspace crates `chem`, `translate`, `geom`, `energy`, `dynamics`, `io`, `gpu`, `cli` (git only; the crates.io `origami` is an unrelated project) · **License:** MIT (CHARMM36 data files under their own academic terms) · **Status:** experimental research code
 
 Deterministic, physics-only protein folding (no ML priors): mRNA → amino-acid sequence → all-atom chain (NeRF) → CHARMM36-derived force field with GB-OBC II implicit solvent and analytical SASA → L-BFGS minimization, BAOAB Langevin dynamics, replica-exchange MD, and co-translational growth. It folds chignolin to 1.43 Å Cα RMSD; larger proteins (Trp-cage, villin) only compact. Unlike most of the ecosystem it is **not** first-party pure Rust: it uses `nalgebra`, `rayon`, `image`, and `wgpu` (Metal GPU kernels), and was developed on Apple Silicon.
 
@@ -301,7 +410,7 @@ origami render traj.pdb --output-dir frames/ --width 800 --height 600 --frame-dt
 origami analyze traj.pdb --reference native.pdb --output metrics.tsv --cluster-cutoff 1.5
 ```
 
-**Gotchas:** The SASA hydrophobic term is roughly 30× slower. Its strength is tuned with the `ORIGAMI_SASA_GAMMA_SCALE` env var. Outputs are multi-MODEL PDB trajectories and TSV metrics.
+**Gotchas:** Requires Rust 1.89+ (edition 2024). The SASA hydrophobic term is roughly 30× slower. Its strength is tuned with the `ORIGAMI_SASA_GAMMA_SCALE` env var. Outputs are multi-MODEL PDB trajectories and TSV metrics.
 
 ## x11anywhere
 

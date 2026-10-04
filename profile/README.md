@@ -23,7 +23,7 @@ We develop and maintain a wide range of open-source tools and libraries, primari
 | [OxideAV](https://github.com/OxideAV) | Pure-Rust media transcoding and streaming framework — 140+ codec, container and filter crates | ![Stars](https://img.shields.io/github/stars/OxideAV/oxideav-workspace) |
 | [squashfs](https://github.com/KarpelesLab/squashfs) | SquashFS read/write implementation in pure Go | ![Stars](https://img.shields.io/github/stars/KarpelesLab/squashfs) |
 | [fstool](https://github.com/KarpelesLab/fstool) | Build, inspect, convert and repack disk images and filesystems in pure Rust | ![Stars](https://img.shields.io/github/stars/KarpelesLab/fstool) |
-| [compcol](https://github.com/KarpelesLab/compcol) | 30+ compression codecs behind one streaming API, pure Rust | ![Stars](https://img.shields.io/github/stars/KarpelesLab/compcol) |
+| [compcol](https://github.com/KarpelesLab/compcol) | 40+ compression codecs behind one streaming API, pure Rust | ![Stars](https://img.shields.io/github/stars/KarpelesLab/compcol) |
 | [cterm](https://github.com/KarpelesLab/cterm) | Terminal emulator optimized for AI coding tools | ![Stars](https://img.shields.io/github/stars/KarpelesLab/cterm) |
 | [graphitesql](https://github.com/KarpelesLab/graphitesql) | Pure, safe, `no_std` Rust re-implementation of SQLite | ![Stars](https://img.shields.io/github/stars/KarpelesLab/graphitesql) |
 | [portablesql](https://github.com/portablesql) | Portable SQL toolkit for Go — one codebase for MySQL, PostgreSQL and SQLite | ![Stars](https://img.shields.io/github/stars/portablesql/psql) |
@@ -38,6 +38,7 @@ Interpreters, shells, and runtime environments.
 - **[goro](https://github.com/KarpelesLab/goro)** - PHP interpreter implemented in Go
 - **[goro-rs](https://github.com/KarpelesLab/goro-rs)** - PHP interpreter in Rust
 - **[rustygo](https://github.com/KarpelesLab/rustygo)** - Go → Rust compiler with a Rust runtime (GC, scheduler, channels, reflect) — design stage
+- **[lode](https://github.com/KarpelesLab/lode)** - Lode systems programming language: safety without lifetimes, no runtime, comptime (early development)
 - **[gsh](https://github.com/KarpelesLab/gsh)** - Go native shell replacement
 - **[nodejs](https://github.com/KarpelesLab/nodejs)** - Node.js factory and pool for Go
 
@@ -47,7 +48,7 @@ Tooling built around AI-assisted development.
 - **[teamclaude](https://github.com/KarpelesLab/teamclaude)** - Multi-account Claude proxy with automatic quota-based rotation
 - **[cterm](https://github.com/KarpelesLab/cterm)** - Terminal emulator optimized for AI coding tools
 - **[mcprun](https://github.com/KarpelesLab/mcprun)** - MCP server runner
-- **[manu](https://github.com/KarpelesLab/manu)** - Multipurpose MCP server that gives AI agents hands
+- **[carl](https://github.com/KarpelesLab/carl)** - Local MCP server that gives AI agents hands: Google account access (Gmail, Calendar, Drive…), agent-to-agent messaging, with Carl as the trust boundary (formerly manu)
 - **[atelier](https://github.com/KarpelesLab/atelier)** - Minimal-TUI AI coding harness in Rust for OpenAI-compatible APIs
 - **[aipencil](https://github.com/KarpelesLab/aipencil)** - Render structured JSON scene descriptions to deterministic SVG/PNG
 - **[nixvm](https://github.com/KarpelesLab/nixvm)** - Portable sandbox running a real Linux userland by emulating syscalls, not hardware
@@ -67,6 +68,7 @@ A growing family of pure-Rust implementations — no C, no FFI, often `no_std`. 
 - **[puregit](https://github.com/KarpelesLab/puregit)** - Git from scratch: object model, packfiles, smart protocol client + server over HTTP and SSH
 - **[fstool](https://github.com/KarpelesLab/fstool)** - Build, inspect, convert, and repack disk images and filesystems
 - **[origami](https://github.com/KarpelesLab/origami)** - Experimental first-principles protein folder (all-atom MD, GPU-accelerated via wgpu)
+- **[cadlab](https://github.com/KarpelesLab/cadlab)** - Headless electronics CAD for programs and AI agents: parts, circuits, boards, autorouting, DRC, fab outputs (CLI + MCP)
 
 **Systems & toolchain**
 - **[kintane](https://github.com/KarpelesLab/kintane)** - Modular OS kernel, from no-MMU microcontrollers to multi-socket SMP
@@ -85,8 +87,7 @@ A growing family of pure-Rust implementations — no C, no FFI, often `no_std`. 
 - **[purecrypto](https://github.com/KarpelesLab/purecrypto)** - Crypto toolkit: classical & post-quantum, X.509, TLS/DTLS/QUIC
 - **[purecrypto-tpm](https://github.com/KarpelesLab/purecrypto-tpm)** - TPM 2.0 stack speaking the wire protocol directly, no tpm2-tss
 - **[puremp](https://github.com/KarpelesLab/puremp)** - Arbitrary-precision arithmetic: integers, rationals, MPFR-class floats, polynomials, matrices
-- **[compcol](https://github.com/KarpelesLab/compcol)** - 30+ compression/decompression codecs behind one uniform streaming API
-- **[minizlib](https://github.com/KarpelesLab/minizlib)** - Tiny gzip/zlib/deflate codec: `no_std`, no allocation, no `unsafe`, ~2.5 KB decompressor
+- **[compcol](https://github.com/KarpelesLab/compcol)** - 40+ compression/decompression codecs behind one uniform streaming API, plus an allocation-free `embed` mode for microcontrollers (absorbed minizlib)
 - **[minlz-rs](https://github.com/KarpelesLab/minlz-rs)** - S2 compression, binary-compatible with Go's klauspost/compress/s2
 - **[anydcode](https://github.com/KarpelesLab/anydcode)** - Encode/decode 50+ 1D/2D barcode symbologies (QR, Data Matrix, PDF417, Aztec, App Clip Codes…)
 - **[charcode](https://github.com/KarpelesLab/charcode)** - WHATWG Encoding Standard character conversion, zero deps, no `unsafe`
@@ -99,6 +100,7 @@ A growing family of pure-Rust implementations — no C, no FFI, often `no_std`. 
 - **[rsupd](https://github.com/KarpelesLab/rsupd)** - Signed release distribution and in-place auto-updates (successor to goupd)
 - **[cacrt](https://github.com/KarpelesLab/cacrt)** - `no_std` curated CA root certificates by OpenSSL subject hash
 - **[psl2](https://github.com/KarpelesLab/psl2)** - Fast `no_std` Public Suffix List with built-in IDNA
+- **[polyclip](https://github.com/KarpelesLab/polyclip)** - Exact integer 2D polygon geometry: booleans, offsetting, arcs, distance queries, triangulation
 
 ### Databases & SQL
 Database toolkits and storage engines.
@@ -120,7 +122,7 @@ Building blocks for cloud-native applications and distributed systems.
 Low-level networking tools and protocol implementations.
 
 - **[magictls](https://github.com/KarpelesLab/magictls)** - Auto PROXY/PROXYv2/TLS detection on TCP streams
-- **[dns](https://github.com/KarpelesLab/dns)** - Modular DNS tools
+- **[dns](https://github.com/KarpelesLab/dns)** / **[dnsbox](https://github.com/KarpelesLab/dnsbox)** - DNS message parsing/encoding and DNSSEC (Go / `no_std` Rust)
 - **[pktkit](https://github.com/KarpelesLab/pktkit)** / **[pktkit-rs](https://github.com/KarpelesLab/pktkit-rs)** - Zero-copy packet toolkit for virtual network topologies — switches, NAT, virtual TCP/IP, WireGuard (Go / Rust)
 - **[slirp](https://github.com/KarpelesLab/slirp)** - SLiRP networking stack in Go
 - **[pppoeproxy](https://github.com/KarpelesLab/pppoeproxy)** - Simple PPPoE client/server proxy
@@ -169,7 +171,7 @@ Pure Go implementations for various file system and archive formats.
 Multimedia processing libraries — pure Rust and pure Go, no C dependencies where possible.
 
 - **[OxideAV](https://github.com/OxideAV)** - Pure-Rust media transcoding and streaming — no C libraries, no FFI, every format implemented clean-room from the spec
-  - 140+ crates: video (H.264/H.265/H.266, AV1, VP8/VP9, ProRes…), audio (AAC, Opus, FLAC, MP3, AC-3, DTS…), images (PNG, WebP, JPEG XL, AVIF, HEIF…), containers (MP4, Matroska, Ogg…) and subtitles
+  - 140+ crates: video (H.264/H.265/H.266, AV1, VP8/VP9, ProRes…), audio (AAC, Opus, FLAC, MP3, AC-3, DTS…), images (PNG, WebP, JPEG XL, AVIF, HEIF…), containers (MP4, Matroska, Ogg…), subtitles, and 3D/CAD (STL, OBJ, glTF, USDZ, FBX, IFC, STEP, VRML, X3D) with CPU and GPU scene renderers
   - The `oxideav` CLI and `oxideplay` player ship from [oxideav-workspace](https://github.com/OxideAV/oxideav-workspace); use crates individually or all at once via [oxideav-meta](https://github.com/OxideAV/oxideav-meta)
 - **[avgo](https://github.com/KarpelesLab/avgo)** - AV library in Go
 - **[ffprobe](https://github.com/KarpelesLab/ffprobe)** - FFprobe tools in Go
@@ -214,6 +216,8 @@ Libraries for interacting with hardware devices.
 - **[pixoo64](https://github.com/KarpelesLab/pixoo64)** - Pixoo64 LED display library
 - **[usbmagic](https://github.com/KarpelesLab/usbmagic)** - Library and CLI for programmable USB test instruments (Cynthion), with [FPGA gateware](https://github.com/KarpelesLab/usbmagic-gateware)
 - **[selecard](https://github.com/KarpelesLab/selecard)** - Reverse-engineered protocol and tool for the SeleCard III 426 MHz garage remote
+- **[kwi](https://github.com/KarpelesLab/kwi)** - Unpack and repack LOADING.KWI firmware of Toyota/Lexus (Panasonic/Aisin AW) navigation head units
+- **[odeck](https://github.com/KarpelesLab/odeck)** - Open-hardware USB-C dock (KiCad): 10 Gbps + DisplayPort, 140 W charging, SD, 2.5 GbE, RP2350 status display (design stage)
 - **[intel-dcapd](https://github.com/KarpelesLab/intel-dcapd)** - Intel DCAP daemon
 
 ### Frontend & Web

@@ -6,18 +6,19 @@ provides threshold signing (MPC), `outscript` provides addresses, scripts and tr
 chains, `ethrpc-rs` talks JSON-RPC to EVM nodes, and `zanolib` covers Zano. `libwallet` is the application that
 ties them together (a TSS wallet backend exposed over C FFI/WASM). The rest are narrower: `evmabiless` (recovers the
 ABI from EVM bytecode, decodes calldata), `erigon-seg` (Erigon 3 snapshot files) and `chiefsplitter` (an on-chain
-Solana program). Several crates are ports of Go libraries in KarpelesLab
-([tss-lib](https://github.com/KarpelesLab/tss-lib), [outscript](https://github.com/KarpelesLab/outscript),
-[ethrpc](https://github.com/KarpelesLab/ethrpc)). `tsslib` is wire- and save-data-compatible with its Go counterpart.
+Solana program). `outscript` and `ethrpc-rs` are ports of Go libraries in KarpelesLab
+([outscript](https://github.com/KarpelesLab/outscript), [ethrpc](https://github.com/KarpelesLab/ethrpc)). `tsslib`
+started as a port of Go [tss-lib](https://github.com/KarpelesLab/tss-lib) but no longer documents compatibility with it.
 
 ## Quick pick
 | Need | Use |
 |------|-----|
 | Threshold (t-of-n) signatures: FROST Ed25519/ristretto255, DKLs23 ECDSA, threshold ML-DSA | [`tsslib`](#tsslib-rs) |
-| Interoperate with / migrate keys from Go `tss-lib` (GG18/GG20 ECDSA, EdDSA) | [`tsslib`](#tsslib-rs) |
-| Derive addresses from a pubkey (BTC-family, EVM, Solana, Cardano, Massa, Zcash) | [`outscript`](#outscript-rs) |
+| Threshold BIP340 Schnorr / Bitcoin Taproot key-path signing (FROST secp256k1) | [`tsslib`](#tsslib-rs) (`frostsecp256k1tss`) |
+| Migrate existing GG18/GG20 ECDSA or GG18-style EdDSA key shares | [`tsslib`](#tsslib-rs) (`ecdsatss`, `eddsatss`) |
+| Derive addresses from a pubkey (BTC-family, EVM, Solana, Cardano, Massa, Tron, Zcash) | [`outscript`](#outscript-rs) |
 | Parse/validate a crypto address for many chains | [`outscript`](#outscript-rs) |
-| Build and sign BTC / PSBT / Taproot / EVM / Solana / Cardano / Zcash-transparent transactions | [`outscript`](#outscript-rs) |
+| Build and sign BTC / PSBT / Taproot / EVM / Solana / Cardano / Tron / Zcash-transparent transactions | [`outscript`](#outscript-rs) |
 | Move PSBTs as QR codes (UR / BBQr) | [`outscript`](#outscript-rs) |
 | no_std / no-alloc transaction signing (hardware wallet, embedded) | [`outscript`](#outscript-rs) |
 | Async JSON-RPC to Ethereum/EVM nodes (native Tokio or browser WASM) | [`ethrpc-rs`](#ethrpc-rs) |
@@ -32,24 +33,26 @@ Solana program). Several crates are ports of Go libraries in KarpelesLab
 
 ## tsslib-rs
 
-**Repo:** https://github.com/KarpelesLab/tsslib-rs · **Crate:** `tsslib` (crates.io `0.2.8`) · **License:** MIT · **Status:** usable. FROST and DKLs23 are the main paths. `mldsatss`, `ecdsatss` and `eddsatss` are experimental and unaudited.
+**Repo:** https://github.com/KarpelesLab/tsslib-rs · **Crate:** `tsslib` (crates.io `0.2.13`) · **License:** MIT · **Status:** usable. FROST and DKLs23 are the main paths. `mldsatss`, `ecdsatss` and `eddsatss` are experimental and unaudited.
 
-A pure-Rust threshold signature library, ported from the Go [`tss-lib`](https://github.com/KarpelesLab/tss-lib).
-It is **wire- and save-data-compatible** with the Go library: either side can consume the other's messages, and
-persisted key shares round-trip between the languages. It has `#![forbid(unsafe_code)]` and does no field
-arithmetic of its own, since all group and lattice math comes from `purecrypto`. Edition 2024, MSRV 1.89.
+A pure-Rust threshold signature library. It started as a port of the Go [`tss-lib`](https://github.com/KarpelesLab/tss-lib),
+but upstream dropped all references to Go tss-lib in October 2026 (commit b835506), so do not assume compatibility with
+Go nodes. The JSON message and key-share formats are stable across releases. The crate is `#![no_std]` + `alloc`
+(the default `std` feature adds OS randomness, blocking `wait()` and OS locks), has `#![forbid(unsafe_code)]`, and does
+no field arithmetic of its own, since all group and lattice math comes from `purecrypto`. Edition 2024, MSRV 1.89.
 
 | Module / feature | Scheme | Output |
 |---|---|---|
 | `frosttss` | FROST(Ed25519, SHA-512), RFC 9591 | Ed25519 signatures |
 | `frostristretto255tss` | FROST(ristretto255, SHA-512) | ristretto255 Schnorr |
+| `frostsecp256k1tss` | FROST(secp256k1, SHA-256), RFC 9591 | BIP340 Schnorr, optional BIP341 Taproot tweak |
 | `dklstss` | DKLs23 threshold ECDSA, secp256k1 | ECDSA (r, s, v) |
 | `mldsatss` | Threshold ML-DSA-44 (FIPS 204), `2 ≤ t ≤ n ≤ 6` | ML-DSA-44 signatures |
-| `ecdsatss` | Legacy GG18/GG20 (Paillier + MtA) | ECDSA; for migrating Go keys |
-| `eddsatss` | Legacy GG18-style threshold EdDSA | Ed25519; for migrating Go keys |
+| `ecdsatss` | Legacy GG18/GG20 (Paillier + MtA) | ECDSA; loads legacy GG18/GG20 save files for migration |
+| `eddsatss` | Legacy GG18-style threshold EdDSA | Ed25519; for migrating legacy GG18-style keys |
 
 **Use it when:** you need t-of-n keygen, signing, resharing or refresh where no single host holds the key; you need
-HD derivation of threshold keys; or you must interoperate with Go `tss-lib` nodes or save files.
+HD derivation of threshold keys; you need threshold Taproot signing; or you must migrate existing GG18/GG20 key shares.
 **Don't use it when / limits:** you need peer authentication, which you must supply through your `MessageBroker`
 transport. Don't use `mldsatss` in production (the README calls it an academic-grade prototype). Use `ecdsatss` and
 `eddsatss` only to migrate existing keys; new deployments should use `dklstss` or `frosttss`.
@@ -57,12 +60,13 @@ transport. Don't use `mldsatss` in production (the README calls it an academic-g
 **Add it:**
 ```toml
 [dependencies]
-tsslib = "0.2"   # or pick protocols: { version = "0.2", default-features = false, features = ["dklstss"] }
+tsslib = "0.2"   # or pick protocols: { version = "0.2", default-features = false, features = ["std", "json", "dklstss"] }
 purecrypto = { version = "0.9", default-features = false, features = ["std", "rng"] }  # for OsRng
 ```
 
 **Key features / cargo features:**
-- Each protocol has a like-named feature, and all are on by default.
+- Each protocol has a like-named feature, and all are on by default, as are `std` and `json`. Without `std`, register
+  entropy with `rng::set_entropy_source`.
 - `tss` core: `PartyId`, `Parameters` / `ReSharingParameters`, the `MessageBroker` / `MessageReceiver` traits,
   `JsonMessage`, and `TssError`, which identifies the culprit through `culprits()`.
 - Networked protocols run as broker-driven parties: `frosttss::Keygen`, `dklstss::KeygenParty`, `SigningParty`,
@@ -72,7 +76,13 @@ purecrypto = { version = "0.9", default-features = false, features = ["std", "rn
   (`derive_child`, `derive_and_sign`, `sign_with_tweak`).
 - `KeyImageParty` (in `frosttss` and `dklstss`) is a threshold PRF that serves as the building block for
   hardened derivation.
-- Keys serialize with `Key::to_json` / `Key::from_json`, in the Go-compatible save format.
+- `dklstss::PairSetupParty` (or `setup_pair`) rebuilds a key's pairwise OT-extension state one pair at a time, so that
+  state can be stored apart from the key core.
+- `frostsecp256k1tss` outputs 64-byte BIP340 signatures, optionally under a BIP341 output key (key-path only or
+  committing to a script tree) and/or a non-hardened BIP32 child. `import_key` brings in an existing secp256k1 key to reshare.
+- Two encodings: JSON (`to_json` / `from_json`, `json` feature) and the compact binary format of `tsslib::wire`
+  (`write_to` / `read_from`, `to_bytes` / `from_bytes`), which is always available and needs no serde_json. Binary is
+  2-3.5x smaller (a DKLs23 key is about 90 KB as JSON, 26 KB binary).
 
 **Example** (in-process DKLs23 2-of-3, from the crate's tests):
 ```rust
@@ -86,26 +96,28 @@ let ids = PartyId::sort(
 );
 let keys = keygen(3, 1, &ids, &mut OsRng)?;          // n=3, t=1: any t+1 = 2 parties sign
 let sig = sign(&keys, &[0, 2], &msg_hash, &mut OsRng)?; // sig.r, sig.s (32-byte BE), sig.v
-let saved = keys[0].to_json()?;                        // Go tss-lib compatible save data
+let saved = keys[0].to_json()?;                        // stable JSON save format (or to_bytes() for binary)
 ```
 
 **Gotchas:**
 - Threshold convention: `t` is the polynomial degree, so signing needs `t + 1` parties, and `keygen` requires `1 ≤ t < n`.
 - DKLs keygen has a documented weakness when `n ≤ 2t`: colluding last-moving dealers can bias the key. Either run
-  keygen only among non-colluding parties or use `n > 2t`. Fixing it changes the wire format, so the fix must land
-  in the Go and Rust implementations together.
-- The default `dklstss` signing path has a selective-failure leak of about one bit per aborted session. It is kept
-  that way for byte compatibility with Go. Cap retries, and reshare after repeated unexplained aborts. Alternatively,
-  use `sign_checked` / `CheckedSigningParty`, which costs about 2x.
+  keygen only among non-colluding parties or use `n > 2t`. Fixing it changes the wire format, so it needs a versioned
+  protocol change, which has not happened yet.
+- The default `dklstss` signing path has a selective-failure leak of about one bit per aborted session. Its wire format
+  is kept fixed because existing peers depend on it. Cap retries, and reshare after repeated unexplained aborts. Alternatively,
+  use `sign_checked` / `CheckedSigningParty`, which costs about 2x and catches inconsistent deviations
+  but, per the source, does not fully close the one-bit leak.
+- The README's install snippet says `version = "0.3"`, but crates.io is at 0.2.13. Use `0.2`.
 - `purecrypto` must resolve to 0.9 across your whole dependency graph, because its types cross crate boundaries.
 
 ## outscript-rs
 
-**Repo:** https://github.com/KarpelesLab/outscript-rs · **Crate:** `outscript` (crates.io `0.2.5`) · **License:** MIT · **Status:** usable. It is actively developed and verified against BIP-174 test vectors.
+**Repo:** https://github.com/KarpelesLab/outscript-rs · **Crate:** `outscript` (crates.io `0.2.6`) · **License:** MIT · **Status:** usable. It is actively developed and verified against BIP-174 test vectors.
 
 A Rust port of Go [`outscript`](https://github.com/KarpelesLab/outscript). It generates output scripts and
 addresses, parses addresses, and builds and signs transactions for Bitcoin-family chains (BTC, BCH, LTC, DOGE,
-Namecoin, Monacoin, Dash, Electraproto), EVM, Solana, Cardano, Massa and Zcash (transparent only). It is
+Namecoin, Monacoin, Dash, Electraproto), EVM, Solana, Cardano, Massa, Tron and Zcash (transparent only). It is
 `#![no_std]`, and a heap-free core covers keys, signing, addresses, PSBT, raw BTC/EVM/Zcash transactions, and
 UR/BBQr parts. All crypto comes from `purecrypto`. Edition 2024, MSRV 1.89.
 
@@ -129,12 +141,13 @@ outscript = "0.2"
   types, RLP/CBOR/JSON, multi-part UR/BBQr), and none (a heap-free core that writes into caller buffers:
   `generate_script`, `address::encode_address_to_slice`, `psbt::Psbt`, `btcraw::RawTx`, `evmraw::RawEvmTx`,
   `zcashtx::ZcashTx`).
-- Chain features: `bitcoin`, `evm`, `solana`, `cardano`, `massa`, `zcash`. Transport features: `bcur` (Uniform
+- Chain features: `bitcoin`, `evm`, `solana`, `cardano`, `massa`, `zcash`, `tron` (added in 0.2.6). Transport features: `bcur` (Uniform
   Resources) and `bbqr` (Coinkite BBQr). Curve features: `secp256k1`, `ed25519`. All chain and transport features
   are on by default.
 - Transaction types: `BtcTx` + `BtcTxSign`, `psbt::Psbt`, `taproot` (script trees, control blocks),
   `EvmTx` / `RawEvmTx` (legacy, EIP-2930, EIP-1559), `solana::new_solana_tx` / `_v0` / `_v1`, `CardanoTx`
-  (including CIP-1852 HD derivation via `cardano_icarus_master_key`), and `zcashtx::ZcashTx` (v5, ZIP-244).
+  (including CIP-1852 HD derivation via `cardano_icarus_master_key`), `zcashtx::ZcashTx` (v5, ZIP-244), and
+  `trontx::TronTx` (protobuf transactions: TRX, TRC-10, TRC-20 / smart-contract calls; addresses via `parse_tron_address`).
 - Also supports Bitcoin Knots unified sighash (`btcraw::SIGHASH_UNIFIED`). `SecpPrivateKey` and
   `CardanoExtendedKey` zeroize on drop.
 

@@ -6,6 +6,7 @@ A foreign-code-free security and networking stack. It is rooted in **`purecrypto
 - **`puressh`** (SSH), **`purecrypto-tpm`** (TPM 2.0) and **`pktkit`** (WireGuard/OpenVPN) take their crypto from `purecrypto`.
 - **`rsurl`** (a curl clone) uses `purecrypto` for TLS/QUIC, the embedded `cacrt` roots by default, `puressh` for `sftp://` and `scp://`, and `psl2` for cookie domain checks.
 - **`httpsd`** (an HTTP/1.1, /2 and /3 server) uses `purecrypto` TLS/QUIC and uses `rsurl` as its ACME client.
+- **`dnsbox`** (DNS wire format) uses `purecrypto` optionally, for DNSSEC signing and verification.
 - **`spotlib`** (E2EE messaging) and **`rsupd`** (a signed auto-updater) sit on top. They use `purecrypto` plus `bottlers` (Bottle signing/encryption), with `rsurl` as the transport.
 
 HTTP/2 HPACK, HTTP/3 QPACK and all compression come from the sibling crate `compcol`.
@@ -23,12 +24,13 @@ HTTP/2 HPACK, HTTP/3 QPACK and all compression come from the sibling crate `comp
 | Embeddable HTTP/HTTPS server (h1/h2/h3, ACME), or a static file server CLI | [`httpsd`](#httpsd) |
 | HTTP(S) client, curl-like CLI, many protocols (FTP, SFTP, WS, ...) | [`rsurl`](#rsurl) |
 | Userspace packet plumbing: virtual L2/L3, NAT, TCP stack, WireGuard, TUN/TAP, AF_XDP | [`pktkit-rs`](#pktkit-rs) |
+| DNS message parsing/building, zero-copy, `no_std`, DNSSEC sign/verify | [`dnsbox`](#dnsbox) |
 | End-to-end encrypted messaging over the Spot network | [`spotlib-rs`](#spotlib-rs) |
 | Signed releases plus in-place self-update for a Rust binary | [`rsupd`](#rsupd) |
 
 ## purecrypto
 
-**Repo:** https://github.com/KarpelesLab/purecrypto · **Crate:** `purecrypto` (crates.io `0.9.3`) · **License:** MIT · **Status:** usable, pre-1.0, broad test coverage (the full Wycheproof suite, NIST ACVP vectors, OpenSSL 3.5 interop). No third-party human audit, not FIPS validated.
+**Repo:** https://github.com/KarpelesLab/purecrypto · **Crate:** `purecrypto` (crates.io `0.9.9`) · **License:** MIT · **Status:** usable, pre-1.0, broad test coverage (the full Wycheproof suite, NIST ACVP vectors, OpenSSL 3.5 interop). No third-party human audit, not FIPS validated.
 
 A cryptography toolkit written entirely in Rust, with no C, no assembly and no third-party crypto crates. It covers constant-time primitives, bignum, RSA/EC/PQC, ASN.1/DER, X.509, TLS 1.2/1.3, DTLS 1.2/1.3 and QUIC v1. The core is `#![no_std]`, every module has its own feature gate, and library code does not use `unsafe` (it is allowed only in the `ffi` feature). The TLS engine is **sans-I/O**: you feed and pop bytes yourself. It also ships a C ABI (which also builds for WASM) and an OpenSSL-style `purecrypto` CLI.
 
@@ -341,7 +343,7 @@ fn main() -> httpsd::Result<()> {
 
 ## rsurl
 
-**Repo:** https://github.com/KarpelesLab/rsurl · **Crate:** `rsurl` (crates.io `0.1.15`) · **License:** MIT · **Status:** functional across a broad protocol surface, in active development. The API may shift before 1.0.
+**Repo:** https://github.com/KarpelesLab/rsurl · **Crate:** `rsurl` (crates.io `0.1.16`) · **License:** MIT · **Status:** functional across a broad protocol surface, in active development. The API may shift before 1.0.
 
 A pure-Rust implementation of curl. It ships as a Rust library, as a C ABI (`rsurl_*`, with the `ffi` feature), and as the `rsurl` CLI. The repo also contains an unpublished `curl-compat` crate that exposes the libcurl ABI (`libcurl.so.4`).
 
@@ -392,7 +394,7 @@ let bytes = client.transfer("ftp://ftp.example.com/pub/file")?;
 
 **Gotchas:**
 - The README lists system CA bundle paths, but the purecrypto backend defaults to the embedded `cacrt` roots (`RootCertStore::with_embedded_roots`). Pass `--cacert` or `--capath` to use system roots.
-- SSH host keys are checked strictly against `known_hosts`. Trust-on-first-use is opt-in via `--ssh-accept-new` or `SshOptions::accept_new`.
+- SSH host keys are checked strictly against `known_hosts`: unknown host keys are rejected by default. This was a breaking change (commit 7ec59b9, released in 0.1.16). Trust-on-first-use is opt-in via `--ssh-accept-new` or `SshOptions::accept_new`.
 - The MSRV is 1.89 because `purecrypto` requires it.
 
 ## pktkit-rs
@@ -445,6 +447,80 @@ assert_eq!(pkt.udp().unwrap().dst_port(), 53);
 **Gotchas:**
 - On `wasm32` you must drive the timers yourself (`vclient::Client::tick`, `wg::Handler::maintenance`, `nat::Nat::sweep`, and others).
 - On `wasm32-unknown-unknown` the host must provide the `pktkit.now_ms`, `pktkit.unix_ms` and `purecrypto.random_get` imports.
+
+## dnsbox
+
+**Repo:** https://github.com/KarpelesLab/dnsbox · **Crate:** `dnsbox` (crates.io `0.0.1` is only the header scaffold, so use git) · **License:** MIT · **Status:** early development, API not stable. `ROADMAP.md` checkboxes lag behind the code. Messages, names, the builder, TCP framing and DNSSEC are already implemented; EDNS(0) options, SVCB/HTTPS, TSIG and most extra record types are not yet.
+
+A zero-copy DNS wire-format library that parses and builds both queries and responses. It is `#![no_std]` and `#![forbid(unsafe_code)]`, and has no dependencies in the core. A parsed `Message<'a>` is a view over your `&[u8]`, and names and RDATA are decoded lazily. `MessageBuilder` writes straight into a caller buffer (`&mut [u8]`, or a `Vec` with `alloc`) and handles name compression, section counts, size limits and RFC 2181 truncation. Parsing is hardened against hostile input. It does not panic. It bounds its work, rejecting compression-pointer loops and enforcing label and name limits. Protocol numbers (`Rtype`, `Class`, `Rcode`, ...) are open newtypes, so unknown values round-trip.
+
+**Use it when:**
+- You are writing a DNS server, resolver, proxy or packet inspector in Rust and need fast, allocation-free parsing and building, including on embedded targets or in `no_std`.
+- You need DNSSEC RRSIG verification or signing, DS digests or NSEC3 hashing without OpenSSL. These come through `purecrypto`.
+
+**Don't use it when / limits:**
+- It has no I/O and no resolver logic: no sockets, no recursion, no caching. You bring the transport.
+- There is no typed EDNS(0) yet. Send OPT as `UnknownRdata::new(Rtype::OPT, ..)`; see the `MessageBuilder::query` docs.
+- Typed RDATA covers A, AAAA, NS, CNAME, PTR, MX, SOA, TXT, HINFO, MINFO, WKS, NULL, MB/MD/MF/MG/MR, plus DNSSEC (DNSKEY, DS, CDS, CDNSKEY, RRSIG, SIG, KEY, NSEC, NSEC3, NSEC3PARAM, DLV, TA). Every other type comes back as `RData::Unknown` with the raw bytes.
+
+**Add it:**
+```toml
+[dependencies]
+dnsbox = { git = "https://github.com/KarpelesLab/dnsbox" }
+# no_std, no alloc:
+# dnsbox = { git = "https://github.com/KarpelesLab/dnsbox", default-features = false }
+# DNSSEC sign/verify:
+# dnsbox = { git = "https://github.com/KarpelesLab/dnsbox", features = ["dnssec"] }
+```
+
+**Key features / cargo features:**
+- `std` (default; implies `alloc`) adds `std::error::Error` and `std::io` glue. `alloc` adds owned types and `MessageBuilder::new_vec` / `query_vec` / `response_vec`.
+- `dnssec-digest` adds DS digests and NSEC3 hashing through `purecrypto/hash`. It works in `no_std` without alloc.
+- `dnssec` adds RRSIG verify/sign for RSA, ECDSA P-256/P-384, Ed25519 and Ed448 (`dnssec::{verify_rrsig, sign_rrset, PurecryptoVerifier, SigningKey, ZoneKey}`). It needs `alloc`.
+- Builder helpers: `MessageBuilder::query(buf, id, name, qtype, class)` and `MessageBuilder::response(buf, &query)`. `response` copies the ID, opcode, RD and the question. The builder also has `set_limit`, `push_rrset` and `copy_message`, which truncate by whole RRset and set TC. `checkpoint`/`rollback` and `new_tcp` are available for length-prefixed messages.
+- `dnsbox::tcp`: `write_frame`, `split_frame`, and `FrameReassembler` for reading streams.
+- Records implement `Display` in zone-file presentation format.
+
+**Example** (verified against the git HEAD):
+```rust
+use dnsbox::{Class, Message, MessageBuilder, NameBuf, Rcode, Rtype};
+use dnsbox::rdata::{Mx, RData};
+
+fn main() -> Result<(), dnsbox::Error> {
+    // Client: a query for example.com MX, written into a stack buffer.
+    let name: NameBuf = "example.com".parse()?;
+    let mut qbuf = [0u8; 512];
+    let query = MessageBuilder::query(&mut qbuf, 0x1234, &name, Rtype::MX, Class::IN)?.finish();
+
+    // Server: parse the query (zero-copy) and answer it.
+    let query = Message::parse_validated(query)?;
+    let mut rbuf = [0u8; 512];
+    let mut b = MessageBuilder::response(&mut rbuf, &query)?; // copies ID, RD, question
+    let mx: NameBuf = "mail.example.com".parse()?;
+    b.push_answer(&name, Class::IN, 3600, &Mx { preference: 10, exchange: mx.as_name() })?;
+    let wire = b.finish();
+
+    // Client: read the answer.
+    let resp = Message::parse_validated(wire)?;
+    assert_eq!(resp.id(), 0x1234);
+    assert_eq!(resp.flags().rcode(), Rcode::NOERROR);
+    for rr in resp.answers() {
+        let rr = rr?;
+        println!("{rr}"); // example.com. 3600 IN MX 10 mail.example.com.
+        if let RData::Mx(mx) = rr.data()? {
+            assert_eq!(mx.preference, 10);
+        }
+    }
+    Ok(())
+}
+```
+
+**Gotchas:**
+- Do not depend on `dnsbox = "0.0.1"` from crates.io. That release has only `Header`/`Flags`/`Opcode`/`Rcode`.
+- `Message::parse` is lazy. Errors show up as you iterate, which is why each iterator item is a `Result`. `Message::parse_validated` walks the whole message once up front.
+- `NameBuf` is an owned name, stored inline in 255 bytes. `Name<'a>` is the borrowed, pointer-following form. Use `name.as_name()` to borrow a `NameBuf`.
+- The Go module [`dns`](../go.md#dns) (`dnsmsg` + `dnssec`) is the Go counterpart. The two are independent codebases.
+- Read `ARCHITECTURE.md` before adding record types. Each type is one file plus one line in the `rdata_registry!` macro.
 
 ## spotlib-rs
 

@@ -112,35 +112,38 @@ stipple = { git = "https://github.com/KarpelesLab/stipple" }
 | `stipple-gpu` | Experimental EGL/GLES2 present path |
 | `stipple-web` | wasm target that exposes an RGBA framebuffer for a canvas |
 
-**Example** (from `examples/clickdemo`; the view function takes `(&State, &mut Cx<State>)` and returns an `Element`):
+**Example** (the README's counter, which compiles against the current API; the view function takes `(&State, &mut Cx<State>)` and returns an `Element`):
 ```rust
 use stipple::prelude::*;
 
-struct Clicks { n: u32 }
+struct Counter { n: i64 }
 
-fn view(state: &Clicks, cx: &mut Cx<Clicks>) -> Element {
+fn view(state: &Counter, cx: &mut Cx<Counter>) -> Element {
     let theme = *cx.theme();
-    Element::stack(
-        Axis::Horizontal,
-        vec![Element::text(format!("Clicks: {}", state.n), 64.0, theme.palette.on_primary)],
-    )
-    .fill(theme.palette.primary)
-    .align(Align::Center, Align::Center)
-    .on_tap(cx, |s: &mut Clicks| s.n += 1)
+    column(vec![
+        heading(&theme, format!("{}", state.n)),
+        row(vec![
+            button_labeled(&theme, "−").on_tap(cx, |s: &mut Counter| s.n -= 1),
+            button_labeled(&theme, "+").on_tap(cx, |s: &mut Counter| s.n += 1),
+        ])
+        .gap(8.0),
+    ])
+    .gap(12.0)
+    .padding(Insets::uniform(24.0))
 }
 
 fn main() {
-    let mut app = App::new(Clicks { n: 0 }, view)
-        .title("Stipple Clicks")
-        .theme(Theme::dark())
-        .logical_size(Size::new(640.0, 480.0));
-    if let Some(font) = Font::system_default() { app = app.font(font); }
+    let mut app = App::new(Counter { n: 0 }, view)
+        .title("Counter")
+        .theme(Theme::dark());
+    if let Some(font) = Font::system_default() {
+        app = app.font(font);
+    }
     app.run(); // native window, or a one-shot headless render with no display
 }
 ```
 
 **Gotchas:**
-- The README's `Column((..))`/`Button(..)` snippet with a one-argument `view(&State)` describes the intended API. The examples in `examples/*` compile against the current API, so copy from those.
 - Examples run with `cargo run -p <name>`, for example `window`, `clickdemo`, `textinput`, `themegallery`, `calculator` or `tabsdemo`.
 
 ## ldtray

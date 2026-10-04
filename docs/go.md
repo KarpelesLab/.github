@@ -41,6 +41,7 @@ Conventions for this file: module path is `github.com/KarpelesLab/<repo>` unless
 | Loose type conversion (`any` to struct/int/...) | [`typutil`](#typutil) |
 | Self-updating Go binaries | [`goupd`](#goupd) |
 | Sandbox `npm install` and similar | [`bnpm`](#bnpm) |
+| Unpack/repack Toyota/Lexus (Panasonic/Aisin AW) nav head-unit LOADING.KWI firmware | [`kwi`](#kwi) |
 
 ---
 
@@ -556,11 +557,32 @@ ICU-compatible features in pure Go. Subpackages: `transliterate`, which takes IC
 
 ## Hardware
 
+### kwi
+**Repo:** https://github.com/KarpelesLab/kwi · **Module:** `github.com/KarpelesLab/kwi` · **License:** MIT · **Status:** experimental (reverse-engineering)
+
+Reads, extracts and repacks `LOADING.KWI`, the program/OS update container of Panasonic/Aisin AW factory navigation head units on the Renesas R-Car H1 platform (confirmed on Toyota `86100-5818x` / `CQ-UT24J0AJ` and the shared Land Cruiser/Lexus modules, which run MontaVista Linux 2.6.35). It targets the OS image, not map data. Stdlib only, no cgo.
+- Package `kwi`: `Parse(data)` / `ParseReader(r)` return an `*Image` with `Entries` (manifest components: boot bitmaps, `pmb`, `rootfs`, `USRCONF`, `xipImage`). `EntryData(name)` returns one component. `Pack(map[string][]byte)` rebuilds the file with replaced components; the set of component names must stay the same.
+- Package `kwi/pcrd`: the `rootfs` PCRD container (256 KiB header with a per-4 KiB-page CRC table around an XIP ext2). `Decode` returns the ext2 bytes, `Verify` lists bad pages, and `Encode(ext2)` rebuilds the container with all CRCs recomputed. Unmodified round-trips are byte-identical.
+- Package `kwi/pmb`: the 512-byte boot-parameter block (kernel load address/size/CRC, rootfs and USRCONF locations, kernel command line). It has getters plus `SetCmdline`, `SetKernelImage` and `SetKernelLoad`.
+- CLIs: `go install github.com/KarpelesLab/kwi/cmd/kwi@latest` (`info`, `extract`, `replace`). The `cmd/pcrd` (`unpack`, `pack`, `verify`) and `cmd/pmb` (`info`, `setcmdline`, `setkernel`) tools install the same way.
+
+```go
+raw, _ := os.ReadFile("LOADING.KWI")
+img, err := kwi.Parse(raw)
+rootfs, _ := img.EntryData("rootfs")
+c, err := pcrd.Decode(rootfs) // c.Ext2 is the ext2 filesystem image
+// ...edit c.Ext2 in place without changing its size...
+newRootfs, err := pcrd.Encode(c.Ext2)
+out, err := img.Pack(map[string][]byte{"rootfs": newRootfs})
+```
+
+**Gotchas:** the `pmb` header CRC and the USRCONF CRC algorithms are not reversed yet. `pmb.HCRCReproduced()` always returns false, and edits keep the old values. It is also unknown whether the head unit's updater validates a KWI before flashing, so test only on a donor unit.
+
 - **streamdeck** (MIT): Elgato/Corsair Stream Deck control without the vendor software. No cgo, Linux only.
 - **hid** (MIT): a pure-Go HID driver with no dependencies. Linux 386/amd64 only.
 - **pixoo64** (MIT): sends images and commands to a Divoom Pixoo64 over the LAN, by IP address.
 - **intel-dcapd** (https://github.com/KarpelesLab/intel-dcapd): a single-binary replacement, written in Go, for Intel's SGX DCAP PCCS caching service. Unofficial. Install with `make install` and an Intel API key.
-- `usbmagic` is Rust and `selecard` is Python; see their repos.
+- `usbmagic` is Rust and `selecard` is Python; see their repos. `odeck` is an open-hardware USB-C dock (KiCad 10 project with Python design scripts, design stage: 10 Gbps + DisplayPort, 140 W pass-through charging, SD, 2.5 GbE, RP2350 status display); see https://github.com/KarpelesLab/odeck.
 
 ## Go utilities
 

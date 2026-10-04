@@ -1,10 +1,10 @@
 # Compression, Encodings & Data Formats
 
-Pure-Rust codecs and format libraries with little or no dependency baggage. For compression there are three crates, each for a different job. [`compcol`](#compcol) is the full-featured one: 40+ algorithms (deflate/gzip/zlib, zstd, brotli, xz/LZMA, bzip2, LZ4, RAR/StuffIt/LHA decoders, ...) behind one streaming trait, `no_std` + `alloc`, zero deps. [`minizlib`](#minizlib) is a tiny gzip/zlib/deflate codec for microcontrollers, with no allocator and no panics, about 2.5 KB of code for decompression and about 1 KB for compression. [`minlz`](#minlz-rs) is the pick when you need byte-for-byte compatibility with Go's `klauspost/compress/s2` (Snappy-family) or MinIO's MinLZ, or very fast decoding. For data formats, [`emjson`](#emjson) fills the embedded JSON niche: it streams, parses, writes and edits in place in a few hundred bytes of RAM with no allocator, while `serde_json` needs a heap. [`tomlproc`](#tomlproc) is a zero-dependency TOML 1.1 parser/serializer. [`charcode`](#charcode) converts text encodings per WHATWG with no deps and no `unsafe`, [`anyd`](#anydcode) encodes and decodes 1D/2D barcodes, and [`xuid-rs`](#xuid-rs) provides type-prefixed base32 UUIDs.
+Pure-Rust codecs and format libraries with little or no dependency baggage. For compression there are two current crates, each for a different job. [`compcol`](#compcol) is the full-featured one: 40+ algorithms (deflate/gzip/zlib, zstd, brotli, xz/LZMA, bzip2, LZ4, RAR/StuffIt/LHA decoders, ...) behind one streaming trait, `no_std` + `alloc`, zero deps. Its `embed` mode builds the deflate family (gzip/zlib/raw deflate) for microcontrollers, with no heap, no panics and a few KB of code; it absorbed the former [`minizlib`](#minizlib) crate, which is now deprecated. [`minlz`](#minlz-rs) is the pick when you need byte-for-byte compatibility with Go's `klauspost/compress/s2` (Snappy-family) or MinIO's MinLZ, or very fast decoding. For data formats, [`emjson`](#emjson) fills the embedded JSON niche: it streams, parses, writes and edits in place in a few hundred bytes of RAM with no allocator, while `serde_json` needs a heap. [`tomlproc`](#tomlproc) is a zero-dependency TOML 1.1 parser/serializer. [`charcode`](#charcode) converts text encodings per WHATWG with no deps and no `unsafe`, [`anyd`](#anydcode) encodes and decodes 1D/2D barcodes, and [`xuid-rs`](#xuid-rs) provides type-prefixed base32 UUIDs.
 
 **Choosing a compressor:**
-- **compcol**: you need a format other than deflate, a format picked at runtime (factory/magic-byte detection), `std::io`/tokio adapters, decompression of legacy archive codecs, or good gzip ratio (lazy matching + dynamic Huffman). Needs `alloc`.
-- **minizlib**: gzip/zlib/deflate only, on a target with no heap and tight flash/RAM (MCU firmware, bootloaders, OTA images). It has a smaller ratio when compressing (fixed Huffman only) and a slower decode speed (~80 MB/s).
+- **compcol** (standard build): you need a format other than deflate, a format picked at runtime (factory/magic-byte detection), `std::io`/tokio adapters, decompression of legacy archive codecs, or good gzip ratio (lazy matching + dynamic Huffman). Needs `alloc`.
+- **compcol with `embed`**: gzip/zlib/deflate only, on a target with no heap and tight flash/RAM (MCU firmware, bootloaders, OTA images). It has a lower ratio when compressing (fixed Huffman only) and decodes at tens of MB/s. `compcol::embed::flate` keeps the old `minizlib` API. Do not use `minizlib` in new code.
 - **minlz**: you exchange data with Go services that use S2/Snappy or MinLZ, or you need a very fast decoder (tens of GiB/s). Uses `crc` as a dependency and contains a few audited `unsafe` blocks.
 
 ## Quick pick
@@ -14,8 +14,8 @@ Pure-Rust codecs and format libraries with little or no dependency baggage. For 
 | Choose a codec by name at runtime / sniff a compressed stream's format | [`compcol`](#compcol) (`factory`) |
 | Decompress RAR 2/3/5, StuffIt, LHA, LZX/CAB, Quantum, PPMd, LZFSE | [`compcol`](#compcol) |
 | HTTP/2 HPACK or HTTP/3 QPACK header compression | [`compcol`](#compcol) |
-| gunzip/gzip on a microcontroller with no heap, a few KB of flash | [`minizlib`](#minizlib) |
-| Stream-decompress an OTA/firmware image from UART to flash | [`minizlib`](#minizlib) |
+| gunzip/gzip on a microcontroller with no heap, a few KB of flash | [`compcol`](#compcol) (`embed` feature) |
+| Stream-decompress an OTA/firmware image from UART to flash | [`compcol`](#compcol) (`embed::flate`) |
 | S2 / Snappy wire-compatible with Go `klauspost/compress/s2` | [`minlz`](#minlz-rs) |
 | MinLZ (`.mz`, minio/minlz) streams, seekable indexes | [`minlz`](#minlz-rs) |
 | Parse / edit JSON on an MCU with no allocator, or a huge JSON file in constant RAM | [`emjson`](#emjson) |
@@ -26,19 +26,20 @@ Pure-Rust codecs and format libraries with little or no dependency baggage. For 
 
 ## compcol
 
-**Repo:** https://github.com/KarpelesLab/compcol · **Crate:** `compcol` (crates.io `0.6.11`) · **License:** MIT · **Status:** usable (566+ tests, cross-validated against reference tools; fuzz targets)
+**Repo:** https://github.com/KarpelesLab/compcol · **Crate:** `compcol` (crates.io `0.7.2`) · **License:** MIT · **Status:** usable (566+ tests, cross-validated against reference tools; fuzz targets)
 
 A collection of compression algorithms in pure Rust behind one caller-buffered streaming trait (`Encoder`/`Decoder`/`Algorithm`). It is `#![no_std]` and `#![forbid(unsafe_code)]`, has zero runtime dependencies (tokio only with the `tokio` feature), and gates each algorithm behind its own cargo feature. MSRV 1.88, edition 2024.
 
 **Use it when:** you need any mainstream or legacy compression format, want the format chosen from config or a CLI flag, need `Read`/`Write` or tokio `AsyncRead`/`AsyncWrite` adapters, or have to decompress untrusted input with an output cap.
-**Don't use it when / limits:** you have no allocator (only `rle` works without `alloc`; use `minizlib` instead). zstd and brotli encoders produce conformant streams but lag the reference ratio. Some codecs are decode-only (`Error::Unsupported` on encode): RAR 1-5 (license), Quantum, LZFSE, PPMd, StuffIt methods. RAR1 does not decode either. LZX/Amiga LZX encoders emit uncompressed blocks only. This crate handles codec streams, not archive containers (no zip/rar/7z directory parsing).
+**Don't use it when / limits:** in a no-allocator build only `rle` and the `embed` deflate family are available. zstd and brotli encoders produce conformant streams but lag the reference ratio. Some codecs are decode-only (`Error::Unsupported` on encode): RAR 1-5 (license), Quantum, LZFSE, PPMd, StuffIt methods. RAR1 does not decode either. LZX/Amiga LZX encoders emit uncompressed blocks only. This crate handles codec streams, not archive containers (no zip/rar/7z directory parsing).
 
 **Add it:**
 ```toml
 [dependencies]
-compcol = "0.6"                                        # default: alloc, rle, deflate, zlib, gzip, factory
-# compcol = { version = "0.6", features = ["std", "zstd", "brotli", "xz"] }
-# compcol = { version = "0.6", features = ["all"] }    # every algorithm
+compcol = "0.7"                                        # default: alloc, rle, deflate, zlib, gzip, factory
+# compcol = { version = "0.7", features = ["std", "zstd", "brotli", "xz"] }
+# compcol = { version = "0.7", features = ["all"] }    # every algorithm
+# firmware, no heap: compcol = { version = "0.7", default-features = false, features = ["embed", "gzip"] }
 ```
 
 **Key features / cargo features:**
@@ -46,6 +47,7 @@ compcol = "0.6"                                        # default: alloc, rle, de
 - Algorithm features: `deflate`, `deflate64`, `zlib`, `gzip`, `lzma`, `xz`, `lzma2`, `zstd`, `brotli`, `lz4`, `lz5`, `snappy`, `lzw`, `lzss`, `bzip2`, `lzo`, `lzx`, `amiga_lzx`, `quantum`, `lzfse`, `adc`, `ppmd`, `xpress`, `xpress_huffman`, `lznt1`, `lzham`, `lzs`, `packbits`, `lha`, `zip_implode`/`zip_shrink`/`zip_reduce`, `arc_*`, `sit13`/`lzah`/`arsenic`, `rar1`-`rar5`, filters `bcj`/`bcj2`/`delta`, primitives `huffman`/`rangecoder`/`mtf`/`bwt`, and `hpack`/`qpack`. The `all` feature enables everything.
 - One-shot helpers in `compcol::vec`: `compress_to_vec`, `decompress_to_vec`, `*_with(config)`, and `decompress_to_vec_capped` (bomb-safe, returns `Error::OutputLimitExceeded`). `compcol::limit::LimitedDecoder` wraps any decoder with a cap.
 - `Decoder::skip(input, n)` advances through decompressed output without emitting it.
+- `embed` is a mode, not an algorithm: it rebuilds the deflate family (`gzip`, `zlib`, `deflate`) as heap-free variants under the same paths and traits. It adds one-shot `gzip::decompress`, `gzip::decompressed_len` and `gzip::compress` (caller-provided table), `const`-constructible streaming codecs that can live in a `static` (`gzip::Decoder` with a 32 KiB window, `gzip::WindowedDecoder::<N>`, `gzip::Encoder`, `gzip::BlockEncoder::<B, T>`), and `compcol::embed::flate`, the former `minizlib` API (`gunzip`, `Reader`, `Stream`, `Decompressor`, `Compressor`). CI holds gzip streaming decode to about 4 KB of code and 352 B of stack on Cortex-M4.
 - `compcol` CLI binary (`cargo install compcol --features all`), a gzip(1)-style filter with `-t ALGO`, `-d` and auto-detection.
 
 **Example:**
@@ -67,54 +69,27 @@ let mut dec = compcol::factory::decoder_by_name("gzip").expect("compiled in");
 ```
 
 **Gotchas:**
-- The trait methods return `Result<(Progress, Status), Error>`, a tuple. The README's trait sketch shows `Result<Progress, Error>`, which is stale. Loop until `Status::StreamEnd` on `finish()`.
-- The README's install snippet says `version = "0.4"`, which is stale. Use `0.6`.
+- The trait methods return `Result<(Progress, Status), Error>`, a tuple. Loop until `Status::StreamEnd` on `finish()`.
+- The README's install snippets say `version = "0.6"`, but crates.io is at 0.7.2. Use `0.7`.
+- Cargo features unify, so enabling `embed` anywhere in a dependency graph switches every user of compcol in that graph to the small deflate variants (lower ratio, no sync flush, no preset dictionaries). Enable it only in firmware binaries, never in a library. `--all-features` turns it on; `all` does not.
 - `EncoderWriter` finishes on `Drop` on a best-effort basis. Call `.finish()` explicitly to see errors.
 - `factory::detect` does not detect brotli or raw `.lzma` (they have no magic bytes). It only reports codecs that were compiled in.
 - `decompress_to_vec` is unbounded. Use the `_capped` variants for untrusted input.
 
 ## minizlib
 
-**Repo:** https://github.com/KarpelesLab/minizlib · **Crate:** `minizlib` (crates.io `0.1.1`) · **License:** MIT · **Status:** usable (tested against flate2, corruption and truncation fuzzing, CI footprint checks)
+**Repo:** https://github.com/KarpelesLab/minizlib · **Crate:** `minizlib` (crates.io `0.1.2`) · **License:** MIT · **Status:** **deprecated**, superseded by `compcol::embed::flate`
 
-A tiny gzip/zlib/raw-deflate compressor and decompressor built for firmware. It is `no_std` and uses no allocator, no `unsafe`, no dependencies and no panics: no configuration links panic machinery. Full gzip decompression is about 2.4 KB of Thumb-2 code and compression about 1 KB. Decompression needs about 1.5 KiB of stack. All memory (output buffer, 32 KiB window, match table) comes from the caller. MSRV 1.89.
+The tiny `no_std`, no-alloc, no-panic gzip/zlib/deflate codec for firmware. Its code now lives in [`compcol`](#compcol) as `compcol::embed::flate`, with the same API. From 0.1.2 this crate only re-exports that module and gets no further work. Existing code keeps building. The `checksum`, `crc-table`, `concat`, `stored`, `fixed` and `dynamic` features are kept so existing feature lists still build, but they no longer change anything: checksums are always verified, and concatenated members and all block types are always accepted.
 
-**Use it when:** you need gzip/zlib on a microcontroller or bootloader, you stream from UART/socket/flash to flash, you need a bounded decompressor that is safe against bombs by construction, or you want only the decompressed length of a stream (`gunzip_len` needs no window).
-**Don't use it when / limits:** you need any other format or a good compression ratio. The compressor is greedy LZ77 with fixed Huffman only (about 32% vs `gzip -6` at 19% on source code), and matches are found only within a chunk. Decoding runs at about 80 MB/s (bitwise canonical Huffman). There are no preset dictionaries and no access to gzip header fields. On a desktop or server, use `compcol`.
+**Use it when:** never in new code. Use compcol's `embed` feature instead.
 
-**Add it:**
+**Migrate:**
 ```toml
 [dependencies]
-minizlib = "0.1"
-# decompress-only, gzip, dynamic blocks:
-# minizlib = { version = "0.1", default-features = false, features = ["decompress", "gzip", "dynamic"] }
+compcol = { version = "0.7.2", default-features = false, features = ["embed", "gzip"] }
 ```
-
-**Key features / cargo features:** default is all except `crc-table`.
-- `decompress`, `compress`: the two halves. `gzip`, `zlib`: containers (raw deflate is always present).
-- `checksum` (verify CRC-32/ISIZE/Adler-32), `crc-table` (1 KiB table instead of 64 B; faster), `concat` (multi-member gzip).
-- `stored`, `fixed`, `dynamic`: which deflate block types the decoder accepts. Disabled types produce `Error::Unsupported`.
-- API matrix: `gunzip`/`unzlib`/`inflate`/`decompress` (auto-detect), `*_len` (length only), `gzip`/`zlib`/`deflate`. Inputs: `&[u8]`, `Reader` (callback), `Bytes(iter)`, `Decompressor` (push, about 1.1 KiB state). Outputs: `Buffer`, `Stream` (window + callback), `Counter`. Streaming compression: `Compressor` and `BufferedCompressor`.
-
-**Example:**
-```rust
-use minizlib::{gunzip, gzip, Buffer};
-
-let mut table = [0u16; 4096];            // match table, need not be cleared
-let mut gz = [0u8; 4096];
-let gz_len = gzip(b"hello hello hello", &mut table, Buffer::new(&mut gz))? as usize;
-
-let mut out = [0u8; 4096];
-let len = gunzip(&gz[..gz_len], Buffer::new(&mut out))? as usize;
-assert_eq!(&out[..len], b"hello hello hello");
-# Ok::<(), minizlib::Error>(())
-```
-
-**Gotchas:**
-- A `Stream` window must be at least as large as the compressor's window (32 KiB covers everything), otherwise decoding fails with `Error::WindowTooSmall`.
-- `Stream`/`Counter`/`*_len` take a mandatory `max_len`. Exceeding it gives `Error::OutputFull`. Pass `NO_LIMIT` explicitly to opt out.
-- Only disable decoder block types if you control the compressor. General-purpose gzip emits all three.
-- `gzip_size_hint` reads the trailer ISIZE: a last-member-only, mod 2^32, unverified hint.
+Then replace `use minizlib::*` with `use compcol::embed::flate::*`. Function and type names (`gunzip`, `gzip`, `Buffer`, `Reader`, `Stream`, `Decompressor`, `Compressor`, `Error`) are unchanged.
 
 ## minlz-rs
 
@@ -123,7 +98,7 @@ assert_eq!(&out[..len], b"hello hello hello");
 It implements two Snappy-family codecs. **S2** has byte-for-byte identical output to Go `klauspost/compress/s2` in all four modes and decodes Snappy. **MinLZ** is the minio/minlz spec v1.0 `.mz` format; it decodes S2/Snappy, but its output cannot be read by them. Both come with block and stream formats (CRC32C framing), seek indexes and dictionaries. The block API is `no_std` + `alloc`. Decode is very fast (6-27x Go's asm, up to about 135 GiB/s in L1). Uses the `crc` crate and a few documented `unsafe` blocks in hot paths. MSRV 1.81.
 
 **Use it when:** you interoperate with Go services or files using S2/Snappy/MinLZ, or you need the fastest possible decompression (caches, logs, RPC payloads) at a Snappy-like ratio.
-**Don't use it when / limits:** you need gzip/zstd-class ratios (use `compcol`), or no allocator (use `minizlib`). The standard S2 encoder is 2-4x slower than Go's assembly. The MinLZ `Dict` format is crate-local and not interoperable with minio/minlz. The streaming API needs `std`.
+**Don't use it when / limits:** you need gzip/zstd-class ratios (use `compcol`), or no allocator (use `compcol` with `embed`). The standard S2 encoder is 2-4x slower than Go's assembly. The MinLZ `Dict` format is crate-local and not interoperable with minio/minlz. The streaming API needs `std`.
 
 **Add it:**
 ```toml

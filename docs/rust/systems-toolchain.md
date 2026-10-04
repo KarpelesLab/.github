@@ -1,6 +1,6 @@
 # Systems & Toolchain
 
-Low-level pure-Rust infrastructure: an OS kernel (kintane), three ways to run without libc (purestd, fullrust, rustlibc), a compiler back-end framework (latticefoundry), a standalone linker (qld) and assembler (rsasm), an HDL compiler (reticle), a byte-exact decompiler/recompiler (univdreams), a multi-machine emulator (rsemu), and a pseudocode-to-JS/Python transpiler (algoc). They are independent projects. None depends on another, apart from purestd and fullrust, which are built to work together. The libc story in brief: **purestd** is a `std`-shaped library built on raw syscalls; **fullrust** is (a) a patched rustc whose *real* `std` uses raw syscalls, shipped as a Docker image or GitHub Action, and (b) the small runtime crate plus `cargo fullrust` that make purestd programs fully libc-free; **rustlibc** runs the other way and gives **C** programs a libc written in Rust. latticefoundry has its own assembler/linker (`lf-as`, `lf-ld`) and does not use qld or rsasm. qld and rsasm are general-purpose drop-in replacements for GNU ld and GNU as.
+Low-level pure-Rust infrastructure: an OS kernel (kintane), three ways to run without libc (purestd, fullrust, rustlibc), a compiler back-end framework (latticefoundry), a standalone linker (qld) and assembler (rsasm), an HDL compiler (reticle), a byte-exact decompiler/recompiler (univdreams), a multi-machine emulator (rsemu), and a pseudocode-to-JS/Python transpiler (algoc). Most are independent projects; the exceptions are purestd and fullrust, which are built to work together, and the latticefoundry chain (lode → latticefoundry → rsasm/qld). The libc story in brief: **purestd** is a `std`-shaped library built on raw syscalls; **fullrust** is (a) a patched rustc whose *real* `std` uses raw syscalls, shipped as a Docker image or GitHub Action, and (b) the small runtime crate plus `cargo fullrust` that make purestd programs fully libc-free; **rustlibc** runs the other way and gives **C** programs a libc written in Rust. latticefoundry builds on z3rs/puremp and uses rsasm (behind `lf-as`) and qld (behind `lf-ld`); [lode](#lode) is a language whose compiler targets latticefoundry. qld and rsasm are also general-purpose drop-in replacements for GNU ld and GNU as.
 
 ## Quick pick
 
@@ -16,6 +16,7 @@ Low-level pure-Rust infrastructure: an OS kernel (kintane), three ways to run wi
 | Call exports of a 32-bit Windows DLL from Rust in a sandbox | [`univdreams`](#univdreams) (`ud-emulator`) |
 | Emulate NES/Game Boy/SMS/Amiga/Mac/PC/RISC-V/AArch64 machines, or embed an emulator | [`rsemu`](#rsemu) |
 | An LLVM-like compiler back end (SSA IR, optimizer, x86-64 codegen, linker) | [`latticefoundry`](#latticefoundry) |
+| Experimental systems language compiler (proven-safe integer arithmetic, no runtime) on LatticeFoundry | [`lode`](#lode) |
 | Write crypto/codec code once in a DSL and generate JavaScript and Python | [`algoc`](#algoc) |
 | A Rust OS kernel that scales from MMU-less MCUs to SMP servers | [`kintane`](#kintane) |
 
@@ -159,27 +160,91 @@ make hello ARCH=aarch64-unknown-linux-gnu # cross-build
 
 ## latticefoundry
 
-**Repo:** https://github.com/KarpelesLab/latticefoundry · **Crate:** `latticefoundry` (git only) · **License:** Apache-2.0 · **Status:** experimental. The README says "early scaffold", but `ROADMAP.md` says phases 0–9 are done and `lf build` produces running static x86-64 executables.
+**Repo:** https://github.com/KarpelesLab/latticefoundry · **Crate:** `latticefoundry` (crates.io `0.0.2`) · **License:** MIT · **Status:** experimental but substantial. Roadmap phases 0–9 are complete and most of phase 10; `lf build` produces running executables, and `lf-cc` builds gzip, bzip2, Lua and SQLite byte-identical to gcc.
 
-A clean-room compiler back-end framework in the role of LLVM. It provides a typed SSA IR (block arguments, poison/freeze, opaque pointers), a verifier backed by the [z3rs](https://github.com/KarpelesLab/z3rs) SMT solver, an optimizer (mem2reg, SCCP, simplify_cfg, DCE, e-graph equality saturation, LICM, inlining, `-O0..-O3`, LTO), x86-64 codegen (AArch64 also implemented), DWARF output, its own linker producing static ELF64, and a JIT. The only dependencies are the sibling crates `z3rs` and `puremp`. `unsafe` is limited to the JIT's executable memory.
+A clean-room compiler back-end framework in the role of LLVM. It provides a typed SSA IR (block arguments, poison/freeze, opaque pointers), a verifier and refinement checker backed by the [z3rs](https://github.com/KarpelesLab/z3rs) SMT solver, an optimizer (mem2reg, SCCP, simplify_cfg, DCE, e-graph equality saturation, a z3rs superoptimizer, LICM, inlining, `-O0..-O3`, LTO), x86-64 and AArch64 codegen, DWARF output, and an in-process JIT. Direct dependencies are only sibling crates: `z3rs`, `puremp`, [rsasm](#rsasm) (behind `lf-as`) and [qld](#qld) (behind `lf-ld` for non-`.lfo` inputs). `unsafe` is confined to the JIT.
 
-**Use it when:** you are building a language front end and want a pure-Rust back end, or you are researching verified optimization.
-**Don't use it when / limits:** you need production codegen or many targets. The output is x86-64 Linux static ELF only (no libc linking), and the AArch64 backend is validated only via an interpreter. `lf-as` and `lf-dis` are stubs. The public API is unstable. Not on crates.io.
+**Use it when:** you are building a language front end and want a pure-Rust back end (this is what [lode](#lode) does), you need to compile C without gcc/clang (`lf-cc`), or you are researching verified optimization.
+**Don't use it when / limits:** you need production codegen or broad targets. x86-64 is the solid target (runs natively, System V and Microsoft x64 ABIs); AArch64 is validated against `llvm-mc` and an interpreter. `lf-cc` has no `long double` (it is `double`), `_Float128` or `_Complex` arithmetic. The public API is unstable (0.0.x).
 
-**Build / run:**
+**Add it / install:**
+```toml
+[dependencies]
+latticefoundry = "0.0.2"
+```
 ```sh
-cargo build --release          # binaries: lf, lf-opt, lf-ld, lf-as, lf-dis
-lf build foo.lf -o foo -O2 -g  # .lf (text) / .lfb (binary) IR -> static executable; --lto, --entry, --no-verify
-lf-opt -O2 foo.lf -o foo.lfb   # verify/optimize/re-encode IR; -p mem2reg,sccp,... ; --emit lf|lfb
-lf-ld -o out -e main a.lfo b.lfo
+cargo install latticefoundry   # binaries: lf, lf-opt, lf-ld, lf-as, lf-dis
 ```
 
-**C front end:** `lf-cc/` is a separate crate in the same repo (not built from the root). Build it with cargo run inside `lf-cc/`:
+**CLI:**
+```sh
+lf build foo.lf -o foo -O2 -g        # .lf (text) / .lfb (binary) IR -> static ELF64, no libc, no system linker; --lto
+lf build --target <triple> -c foo.lf # relocatable ELF, PE/COFF or Mach-O object; --oformat binary|ihex for firmware
+lf build --shared -o libfoo.so foo.lf  # x86-64 PIC shared library linked by qld; --pie, -c --pic
+lf-opt -O2 foo.lf -o foo.lfb         # verify/optimize/re-encode IR; -p mem2reg,sccp,... ; --emit lf|lfb
+lf-as / lf-dis                       # GNU-syntax assembler (x86-64, AArch64, RISC-V via rsasm) / disassembler
+lf-ld -o out -e main a.lfo b.lfo     # own static linker for .lfo; any other input takes a full GNU ld command line (qld)
+```
+
+`lf-dis` disassembles ELF, `.lfo`, COFF/PE, Mach-O, wasm modules and flat binaries (`--raw --arch`) for x86-64 (AT&T or `--syntax intel`), AArch64, RISC-V RV64GC (with arch detection), Thumb-2, AVR and wasm32; output matches `llvm-objdump` on LF's own objects.
+
+**C front end (`lf-cc`):** a separate crate in the same repo, not published and not built from the root (`cd lf-cc && cargo build --release`). It compiles against the real glibc `/usr/include` and links through qld. Coverage includes GNU attributes, statement expressions, computed goto, `__builtin_*`, the System V struct ABI (objects mix with gcc-compiled code), C11 atomics (`_Atomic`, `<stdatomic.h>`, `__atomic_*`/`__sync_*`), GCC vector types, thread-local storage, `__int128` with gcc's ABI, visibility/weak symbols, and `-fPIC`/`-shared`/`-pie`.
 ```sh
 lf-cc -O2 -g -o hello hello.c     # -S / --emit-lf dumps the lowered .lf IR
 ```
 
-**Gotchas:** it is a single package, not a workspace. Rust 1.88+ (edition 2024). Design is documented in `docs/design-tenets.md` and `docs/ir-design.md`.
+**Gotchas:** it is a single package, not a workspace. Rust 1.89+ (edition 2024). Design is documented in `docs/design-tenets.md` and `docs/ir-design.md`.
+
+## lode
+
+**Repo:** https://github.com/KarpelesLab/lode · **Crate:** `lode` (git only. The crates.io crate named `lode` is an unrelated Ruby package manager) · **License:** MIT · **Status:** early development. The design docs are far ahead of the compiler, which handles a small subset of the language and has one target.
+
+A new systems programming language, pitched as "the best of Rust, Zig and Go, each pushed to its limit". This repo is its compiler, written in Rust as one package that provides both the `lode` library and the `lode` binary. The aims are memory safety and data-race freedom without lifetime annotations, no undefined behaviour and no hidden crash paths in safe code, no runtime, Zig-style `comptime`, and opt-in green threads and structured concurrency. The back end is [`latticefoundry`](#latticefoundry), taken from crates.io (`0.0.2`). The compiler itself is `#![forbid(unsafe_code)]`. A hello world compiles to a 1,049-byte static ELF that makes exactly two syscalls (`write`, `exit`).
+
+**Use it when:** you are experimenting with or contributing to the language, or you want a working example of a front end that emits LatticeFoundry IR and links with LatticeFoundry's linker.
+**Don't use it when / limits:**
+- Do not use it for real programs. The only output is static x86-64 Linux executables.
+- The working subset is functions, `let`/`var`, `if`/`while`/`loop`, `break`/`continue`, `const`, integer types, `bool`, `str`, packages (`import "std/..."`, `pub`), `unsafe` blocks, raw pointers and the `syscall` intrinsic.
+- None of these are implemented yet: structs, sum types, generics/`comptime`, `throws`, allocators, concurrency, `lode fmt`.
+- The standard library is only `std/io` (`print`, `eprint`) and `std/os`.
+
+**Install / run:**
+```sh
+git clone https://github.com/KarpelesLab/lode && cd lode
+cargo build --release                      # MSRV 1.89, edition 2024
+target/release/lode run hello.lode           # build to a temp file, run it, exit with its status
+target/release/lode build hello.lode -O2 -o hello   # -O0 (default) .. -O3
+target/release/lode build hello.lode --emit=ir      # print LatticeFoundry IR instead
+target/release/lode check hello.lode         # type/proof check only
+```
+
+```
+package main
+
+import "std/io"
+
+fn main() {
+	io.print("hello world\n")
+}
+```
+`fn main() -> u8` makes the return value the exit status.
+
+**Key features:**
+- **Proven arithmetic.** Plain `+ - * / % <<`, negation and narrowing conversions such as `u8(x)` compile only when the checker can prove they cannot overflow, divide by zero or truncate. The checker tracks value ranges and relations between variables, and narrows them on conditions and early returns. When it cannot prove safety, the build fails with a diagnostic: `cannot prove that this \`u32\` value fits in \`u8\``. Use `+% -% *% <<%` to wrap and `+| -|` to saturate.
+  ```
+  fn clamp_to_u8(x: i32) -> u8 {
+  	if x < 0 { return 0 }
+  	if x > 255 { return 255 }
+  	return u8(x)          // accepted: 0 <= x <= 255 is proven here
+  }
+  ```
+- Library API (`lode::check`, `lode::compile_ir`, `lode::ir_text`, `lode::build_executable`) operates on a `lode::source::SourceMap` and a root `FileId`. `build_executable` returns the ELF image as `Vec<u8>`.
+- The design specs live in `docs/`: `concept.md`, `safety.md`, `memory.md`, `comptime.md`, `concurrency.md`, `errors.md`, `packages.md`, `syntax.md`, `types.md` and `backend.md`. The planned targets run from 8-bit MCUs to wasm.
+
+**Gotchas:**
+- The compiler finds the standard library through `$LODE_STD`, or falls back to the `std/` directory of the source tree it was built from (`CARGO_MANIFEST_DIR`). If you move the binary, or `cargo install` it and later delete the source checkout, set `LODE_STD`.
+- Test programs in `tests/programs/*.lode` state their expected exit status or errors in their first comment lines. They are the best reference for what currently compiles.
+- Source files use the `.lode` extension and tab indentation (Go style).
 
 ## qld
 
@@ -304,7 +369,7 @@ assert_eq!(m.name.name, "m");
 
 ## univdreams
 
-**Repo:** https://github.com/KarpelesLab/univdreams · **Crates:** workspace of `ud-*` crates; CLI is `ud-cli` (binary `ud`) (crates.io `0.2.0`; repo is at `0.3.0`) · **License:** MIT · **Status:** usable for its core promise (byte-identical round-trip). High-level decompilation is partial.
+**Repo:** https://github.com/KarpelesLab/univdreams · **Crates:** workspace of `ud-*` crates; CLI is `ud-cli` (binary `ud`) (crates.io mostly `0.2.0`: only `ud-core` and `ud-ir` have `0.3.0`; repo is at `0.3.0`) · **License:** MIT · **Status:** usable for its core promise (byte-identical round-trip). High-level decompilation is partial.
 
 A compiler **and** decompiler suite. It decompiles a binary to `.ud` source whose directives pin the compiler's choices (encodings, layout, padding), so that recompiling reproduces the input **byte for byte**. Formats: ELF64 (x86-64, x86, aarch64), PE/COFF (MSVC/MinGW), thin Mach-O (x86-64, arm64), 16-bit Windows NE, and raw 6502. It lifts to structured statements (if/switch/goto, calls with argument folding), reads DWARF signatures, and discovers functions via symtab, eh_frame, exports and signatures. It also includes a sandboxed **i386 Win32 emulator** (`ud-emulator`). Runs in the browser: https://karpeleslab.github.io/univdreams/. Dependencies include `iced-x86` and `gimli`, so it is not dependency-free.
 
@@ -334,7 +399,7 @@ let ptr = guest.alloc(&vec![0u8; 4096])?;
 let rc: i32 = guest.call("Decompress", (ptr, 4096u32))?;
 let out = guest.read(ptr, 4096)?;
 ```
-Variants: `Guest::load_raw` (skip DllMain), `load_into`/`load_raw_into` (bring your own `Sandbox` with an instruction budget or VFS `Context`), `alloc_cstr`, `write`, `sandbox_mut()`. The guest has no host filesystem, network or registry access unless you attach it. Use the git dependency if a feature is missing from the crates.io 0.2.0 release.
+Variants: `Guest::load_raw` (skip DllMain), `load_into`/`load_raw_into` (bring your own `Sandbox` with an instruction budget or VFS `Context`), `alloc_cstr`, `write`, `sandbox_mut()`. The guest has no host filesystem, network or registry access unless you attach it. Use the git dependency if a feature is missing from the crates.io 0.2.0 release. The repo now requires Rust 1.89+ (edition 2024).
 
 ## rsemu
 
