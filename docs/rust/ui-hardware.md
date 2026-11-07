@@ -1,6 +1,6 @@
 # UI & Hardware
 
-Crates for talking to people (terminals, windows, tray icons) and to USB devices, all written with few or no third-party crates. **`noroi`** is a curses-style terminal UI with zero crates.io dependencies. **`stipple`** is a self-drawn, cross-platform GUI toolkit that renders through the pure-Rust `oxideav` media stack. **`ldtray`** puts an icon in the system tray and loads every OS GUI library at runtime, so a headless daemon still links and runs. On the hardware side, **`rawusb`** is a libusb replacement with no dependencies, and **`usbmagic`** builds on it to drive USB test instruments, starting with the Great Scott Gadgets Cynthion.
+Crates for talking to people (terminals, windows, tray icons) and to USB devices, all written with few or no third-party crates. **`noroi`** is a curses-style terminal UI with zero crates.io dependencies. **`stipple`** is a self-drawn, cross-platform GUI toolkit that renders through the pure-Rust `oxideav` media stack. **`ldtray`** puts an icon in the system tray and loads every OS GUI library at runtime, so a headless daemon still links and runs. On the hardware side, **`rawusb`** is a libusb replacement with no dependencies, and several tools build on it: **`usbmagic`** drives USB test instruments (starting with the Great Scott Gadgets Cynthion), **`visgrok`** is a driver, protocol analyzer and TUI/web UI for Sipeed SLogic logic analyzers, and **`scopecap`** drives a ToupTek USB3 microscope camera for live mosaic stitching.
 
 ## Quick pick
 | Need | Use |
@@ -12,6 +12,8 @@ Crates for talking to people (terminals, windows, tray icons) and to USB devices
 | Enumerate USB devices, control/bulk/interrupt/isochronous transfers, no libusb | [`rawusb`](#rawusb) |
 | USB HID, mass storage, USB serial (CDC-ACM/FTDI), UVC cameras or USB Ethernet from userspace | [`rawusb`](#rawusb) (class-helper features) |
 | Capture USB 2.0 traffic to pcap with a Cynthion, or send USB Power Delivery messages | [`usbmagic`](#usbmagic) |
+| Record and decode UART/SPI/I2C/SD/ISO 7816 with a Sipeed SLogic, query captures as JSON, convert sigrok `.sr` | [`visgrok`](#visgrok) |
+| Microscope live mosaic / stitching, or a Rust driver for a ToupTek USB3 camera | [`scopecap`](#scopecap) |
 
 ## noroi
 
@@ -78,7 +80,7 @@ fn main() -> std::io::Result<()> {
 
 ## stipple
 
-**Repo:** https://github.com/KarpelesLab/stipple · **Crate:** `stipple` umbrella plus a workspace of `stipple-*` crates (git only, version 0.0.1) · **License:** MIT · **Status:** pre-alpha. APIs are unstable.
+**Repo:** https://github.com/KarpelesLab/stipple · **Crate:** `stipple` umbrella plus a workspace of `stipple-*` crates (crates.io `0.0.1`, the same code as master at the time of release; master keeps moving) · **License:** MIT · **Status:** pre-alpha. APIs are unstable.
 
 A cross-platform, **self-drawn**, fully themeable GUI toolkit. Every platform renders pixel-identical output through a CPU rasterizer. It has native backends that it writes itself for X11, Wayland, Win32 and Cocoa, plus a web target (wasm + `<canvas>`, without wasm-bindgen). It uses **no** winit, wgpu, taffy, lyon, GTK or Qt. The only heavy dependency it accepts is the pure-Rust `oxideav` stack (scene graph, rasterizer, font shaping, image and SVG). MSRV is 1.88 (edition 2024).
 
@@ -93,7 +95,7 @@ A cross-platform, **self-drawn**, fully themeable GUI toolkit. Every platform re
 **Add it:**
 ```toml
 [dependencies]
-stipple = { git = "https://github.com/KarpelesLab/stipple" }
+stipple = "0.0.1"            # or the latest: { git = "https://github.com/KarpelesLab/stipple" }
 ```
 
 **Workspace crates:**
@@ -201,7 +203,7 @@ fn main() {
 
 ## rawusb
 
-**Repo:** https://github.com/KarpelesLab/rawusb · **Crate:** `rawusb` (crates.io `0.1.4`) · **License:** MIT · **Status:** usable, pre-1.0. Linux is tested against real hardware. Windows and macOS follow libusb's call sequences but have had less time on real devices.
+**Repo:** https://github.com/KarpelesLab/rawusb · **Crate:** `rawusb` (crates.io `0.1.7`) · **License:** MIT · **Status:** usable, pre-1.0. Linux is tested against real hardware. Windows and macOS follow libusb's call sequences but have had less time on real devices.
 
 Cross-platform USB access in the spirit of libusb, with **no dependencies, no C library and no build script**. It talks directly to usbfs on Linux, WinUSB on Windows and IOKit on macOS. The API has two levels. The convenience layer covers open/claim and synchronous control, bulk and interrupt transfers. The low-level layer is a `Transfer` object that you can submit, cancel, give a callback, or `.await` from any async runtime. One background event thread per `Context` drives completions. MSRV is 1.89.
 
@@ -211,7 +213,7 @@ Cross-platform USB access in the spirit of libusb, with **no dependencies, no C 
 
 **Don't use it when / limits:**
 - On Windows, only devices bound to WinUSB can be claimed. Bind one with Zadig, WCID descriptors or an INF file. There is no device reset on Windows, and only the current configuration can be set.
-- On macOS, interfaces owned by a kernel driver (HID, mass storage, CDC) cannot be claimed.
+- On macOS, claiming an interface owned by a kernel driver (HID, mass storage, CDC) fails with `ErrorKind::Access` unless the process runs as root or has the `com.apple.vm.device-access` entitlement. With that privilege rawusb captures the whole device (detaching the drivers of all its interfaces at once, mass storage excepted) and hands it back to the OS once every interface is released or the handle is dropped.
 - Portable isochronous transfers need every packet to be exactly the endpoint's max packet size, because WinUSB requires that.
 
 **Add it:**
@@ -310,3 +312,76 @@ fn main() -> usbmagic::Result<()> {
 - The bitstreams (`usbmagic-blinky.bit` and `usbmagic-pd-bridge.bit`) are stored in `firmware/` via Git LFS. Run `scripts/pull-gateware.sh` if they are missing.
 
 **Related: [usbmagic-gateware](https://github.com/KarpelesLab/usbmagic-gateware)** (BSD-3-Clause) holds the Amaranth/LUNA FPGA designs for the Cynthion's ECP5. They are built reproducibly in Docker with `docker run ... python3 build.py`. The designs are a bring-up blinky, the PD bridge (FUSB302B I2C over JTAG registers) and an early full-speed USB host PHY bring-up. It is Python rather than Rust, and its bitstreams are flashed with `usbmagic flash`.
+
+## visgrok
+
+**Repo:** https://github.com/KarpelesLab/visgrok · **Crate:** `visgrok` library + `visgrok` CLI (crates.io `0.1.1`; the scripting query commands and the Ledger SEPROXYHAL decoder are on master only, so install from git for them) · **License:** MIT · **MSRV:** 1.89 · **Status:** usable, actively developed.
+
+A from-scratch driver and analyzer for **Sipeed SLogic logic analyzers** (SLogic16 U3, SLogic32 U3, SLogic Combo 8), built on `rawusb`, with no sigrok or vendor library. It streams continuously to disk in its own compressed `.vgk` format (typically 30x to 25 000x smaller than raw, compressed with `compcol`), decodes protocols in real time, and has a terminal UI (ratatui), a web UI, and one-shot JSON query commands meant for scripts and agents. It reads and writes sigrok `.sr` sessions (PulseView), `.vcd` and raw `.bin`.
+
+Decoders: UART (automatic baud detection that follows rate changes), SPI (including SSD1306 OLED framebuffers rendered to PNG), I2C, native SD card bus (commands, CRC7/CRC16, data blocks), ISO 7816 smart cards (ATR, PPS, T=1), and on master Ledger's secure-element/MCU link (SEPROXYHAL packets, reassembled APDUs). Roles can be auto-detected (`--auto`).
+
+**Use it when:**
+- An agent has to read a hardware bus: record with a SLogic and then ask questions of the capture as JSON.
+- You want to convert or inspect sigrok/PulseView captures from the command line.
+- You need a SLogic driver in Rust (`--no-default-features` gives the library without the TUI dependencies).
+
+**Don't use it when / limits:**
+- Your analyzer is not a Sipeed SLogic (it has no other drivers; `.sr`/`.vcd` files from other tools can still be analyzed).
+- You need UHS-I SD clocks (SDR50/SDR104) or decoders it lacks; sample at about 10x the fastest bit rate (4x the SD clock).
+- At the 400 MB/s maximum the analyzer may skip blocks, which breaks decoding of those spans.
+
+**Install / run:**
+```sh
+cargo install visgrok                                      # 0.1.1; or: cargo install --git https://github.com/KarpelesLab/visgrok
+visgrok --list
+visgrok -c 16 -t 1.65 -o capture.vgk --auto                # record 16 channels at 200 MHz, 1.65 V threshold, auto roles
+visgrok -i capture.vgk --headless --auto                   # replay through the analyzers
+visgrok convert capture.vgk capture.sr                     # for PulseView
+visgrok --demo --auto                                      # synthetic UART/I2C/SPI signals, no hardware
+visgrok web                                                # browser UI on http://127.0.0.1:8090/
+```
+
+**Querying a capture (git master):** each command takes the capture file, uses the roles saved in its sidecar (`capture.vgk.json`; override with `-r CH=ROLE`), and prints JSON with `--json`. Times are seconds (`39.67`), with a unit (`120ms`) or a sample index (`#7935109874`).
+```sh
+visgrok summary capture.vgk --json             # channels, activity, buses, decoders, sessions
+visgrok events capture.vgk --from 39.6 --to 39.7 --json
+visgrok events capture.vgk --grep ATR --json
+visgrok event capture.vgk --at 46.177          # one event with every bit and field
+visgrok data capture.vgk -d SSD1306            # byte streams
+visgrok screens capture.vgk -o screens         # each distinct OLED screen as a PNG
+visgrok clock capture.vgk --ch CLK8M           # frequency, duty, drift
+visgrok levels capture.vgk --at 46.18          # every channel's level at a moment
+```
+Roles: `uart`, `uart:BAUD`, `spi-clk`, `spi-mosi`, `spi-miso`, `spi-cs`, `spi-dc`, `i2c-scl:SDA_CH`, `i2c-sda:SCL_CH`, `sd-clk`, `sd-cmd`, `sd-dat0`..`sd-dat3`, `iso-io`, `iso-clk`, `iso-rst`, `idle`.
+
+**Gotchas:**
+- Decoding a long capture is slow the first time; results are cached next to it (`capture.vgk.events`) until the file, roles or decoder settings change (`--no-cache` to redo).
+- Linux needs read/write access to the device node (a udev rule); see rawusb's platform notes.
+- Unlike most KLB crates, the CLI uses third-party crates (clap, ratatui).
+
+## scopecap
+
+**Repo:** https://github.com/KarpelesLab/scopecap · **Binary:** `scopecap` (git only, not published; build from source) · **License:** none (no LICENSE file or license field, so ask before reusing the code) · **Status:** working application, single-author, Linux.
+
+Live capture, stitching and multi-magnification mapping for a microscope with a USB camera (built for an Olympus BX60M). You move the stage by hand and it builds the mosaic as you go: frames are placed by phase correlation, only still frames are pasted, and each pixel keeps the sharpest version seen (focus sweeps give extended depth of field). Projects span magnifications: each objective's layer is registered onto the one below. Everything is recorded (`stream.mjpeg` plus tracking logs) and `scopecap render` rebuilds the mosaic offline with flat-field estimation, per-frame colour correction and focus-aware blending. Export is a PNG tile pyramid with a self-contained `index.html` viewer.
+
+It works with any V4L2 camera that streams MJPEG, and has its own pure-Rust USB3 driver (on `rawusb`) for the ToupTek E3ISPM20000KPA (20 MP Sony IMX183, raw Bayer), with no vendor SDK or kernel module. MJPEG decoding and PNG encoding come from OxideAV; the GUI uses eframe/egui.
+
+**Use it when:**
+- You need a reference for driving a ToupTek E3ISPM camera from Rust, or for rawusb-based camera streaming.
+- You are imaging chips or boards under a microscope and want a mosaic of the whole sample.
+
+**Don't use it when / limits:**
+- You need a reusable library or a license to build on: it is an application with no license.
+- You are not on Linux (V4L2 and the camera path are Linux-only).
+- It uses third-party crates (eframe, rayon, rustfft, anyhow, libc), unlike most of the ecosystem.
+
+**Build / run:**
+```sh
+git clone https://github.com/KarpelesLab/scopecap && cd scopecap
+cargo run --release                                       # live app
+cargo run --release -- render <project-or-scan-dir> --flat auto
+cargo run --release --example toupcap                     # ToupTek stream test: fps and losses
+```
+The ToupTek camera needs USB access, e.g. `SUBSYSTEM=="usb", ATTRS{idVendor}=="0547", ATTRS{idProduct}=="112[23]", MODE="0660", GROUP="video"`. Settings live in `~/.config/scopecap/settings.json`, captures in `~/Pictures/scopecap/`.

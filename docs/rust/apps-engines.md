@@ -1,6 +1,6 @@
 # Applications & Engines
 
-End-user programs and large language/runtime engines built on top of the KarpelesLab pure-Rust foundation crates (`purecrypto`, `rsurl`, `compcol`, `puremp`, `z3rs`, `oxideav`, `puressh`). Several of them are layered: `argus` (web browser) runs page scripts in `kataan` (JavaScript engine) and fetches over `rsurl`; `puregit` and `cterm` reuse `rsurl`/`puressh`; `mathesis` is a WASM front end to `puremp` + `z3rs`; `cadlab` (headless electronics CAD for agents) builds on `polyclip` and, optionally, the OxideAV 3D crates. Most are applications first, but `kataan`, `fstool`, `puregit`, `mathesis`, `cadlab`, and `cterm-core` are also usable as library crates. Maturity varies widely, from production-grade (`fstool`, `kataan`) to experimental (`argus`, `origami`, `goro-rs`).
+End-user programs and large language/runtime engines built on top of the KarpelesLab pure-Rust foundation crates (`purecrypto`, `rsurl`, `compcol`, `puremp`, `z3rs`, `oxideav`, `puressh`). Several of them are layered: `argus` (web browser) runs page scripts in `kataan` (JavaScript engine) and fetches over `rsurl`; `puregit` and `cterm` reuse `rsurl`/`puressh`; `mathesis` is a WASM front end to `puremp` + `z3rs`; `cadlab` (headless electronics CAD for agents) builds on `polyclip` and, optionally, the OxideAV 3D crates. Next to it sit `guide` (a place-and-route engine shared by PCBs and FPGAs, on `polyclip`) and the `csx` + `ems` pair (CSXCAD-compatible models and an FDTD solver replacing openEMS, with HDF5 output through `hdf5rs`). `nanami` synthesizes speech by simulating a vocal tract, with OxideAV for audio I/O. Most are applications first, but `kataan`, `fstool`, `puregit`, `mathesis`, `cadlab`, `ems`, `csx`, `guide` and `cterm-core` are also usable as library crates. Maturity varies widely, from production-grade (`fstool`, `kataan`) to experimental (`argus`, `origami`, `guide`, `nanami`).
 
 ## Quick pick
 
@@ -12,11 +12,15 @@ End-user programs and large language/runtime engines built on top of the Karpele
 | Build/inspect/modify disk images (ext4, FAT, NTFS, XFS, APFS, ISO, SquashFS, qcow2, LUKS…) without root or loop mounts | [`fstool`](#fstool) |
 | Transcode an archive or image in memory (tar.gz → ext4, ISO → tar, …) from Rust | [`fstool`](#fstool) |
 | Read/write git repositories, clone over HTTPS/SSH, serve git, with no libgit2 or C | [`puregit`](#puregit) |
-| Run PHP 8 scripts without a PHP install (experimental) | [`goro-rs`](#goro-rs) |
+| Run PHP 8.5 scripts without a PHP install (94% of php-src tests pass) | [`goro-rs`](#goro-rs) |
 | Exact arithmetic, number theory, polynomial derivatives, small SMT queries with Wolfram-like syntax | [`mathesis`](#mathesis) |
 | Drive terminal sessions programmatically (spawn a PTY, send keys, read the screen as text) over gRPC | [`cterm`](#cterm) |
 | Parse VT100/ANSI output into a screen grid in Rust | [`cterm`](#cterm) (`cterm-core`) |
 | Headless PCB/EDA driven by CLI, Rust or MCP: circuit, ERC, autoroute, DRC, Gerber/IPC-2581 | [`cadlab`](#cadlab) |
+| Electromagnetic FDTD simulation (antennas, microstrip, waveguides), or run openEMS XML models without openEMS | [`ems`](#ems) |
+| Read/write/mesh CSXCAD (openEMS) geometry and material models | [`csx`](#csx) |
+| Deterministic multi-net router over a grid/graph, VTR FPGA routing, KiCad-compatible clearance checks | [`guide`](#guide) |
+| Offline speech/singing synthesis from LLM-friendly markup (physical vocal-tract model, research prototype) | [`nanami`](#nanami) |
 | Physics-based protein structure building, minimization, Langevin/REMD dynamics, PDB output | [`origami`](#origami) |
 | X11 server that forwards to macOS/Windows/X11 displays | [`x11anywhere`](#x11anywhere) |
 
@@ -80,7 +84,7 @@ kataan = "0.0.9"
 # kataan = { version = "0.0.9", default-features = false, features = ["alloc"] }
 ```
 
-**Cargo features:** default = `std, regex, intl, intl-tz-names, module, host, cli, crypto`. Optional: `fetch` (fetch/Node http over `rsurl`), `jit` (x86-64 Linux), `ffi` (C ABI; build with `cargo rustc --lib --release --features ffi --crate-type cdylib`, header `include/kataan.h`). Library users can drop `cli`.
+**Cargo features:** default (crates.io 0.0.9) = `std, regex, intl, intl-tz-names, module, host, cli, crypto`; on master the default also includes `jit` (x86-64 Linux only, inert elsewhere) and `pool-alloc` (the pure-Rust pooling allocator the CLI installs). Optional: `fetch` (fetch/Node http over `rsurl`), `jit` (in 0.0.9), `ffi` (C ABI; build with `cargo rustc --lib --release --features ffi --crate-type cdylib`, header `include/kataan.h`). Library users can drop `cli`.
 
 **CLI:**
 ```sh
@@ -116,51 +120,43 @@ let (console, value) = kataan::nbvm::execute("console.log('hi'); 6 * 7").unwrap(
 
 **Gotchas:**
 - `interp.display(value)` and `interp.realm().to_display_string(value)` both stringify a value (the README uses the latter).
-- crates.io `0.0.9` (2026-09-05) lags master, which has since moved more of the language (ES modules, `using`, optional/super calls) onto the register bytecode VM (`nbvm`). Use a git dependency for the latest behaviour.
+- crates.io `0.0.9` (2026-09-05) lags master by roughly 470 commits (as of 2026-11-07). On master `Interp::run` executes on the register bytecode VM (`nbvm`), the JIT is a default feature and has deopt exits. The example above compiles against both. Use a git dependency for current behaviour.
 - `Ctx` also has `new_object`, `set`, `get`, `call`, `construct`, `new_array`, `type_error`, `set_native_state`/`native_state`, `deferred` (promises). Install host globals with `kataan::host::install_all(&mut interp)`, then call `kataan::host::timers::run_event_loop`.
 - Resource caps are set in `kataan::Limits` (`Interp::new_with_limits`, `nbvm::execute_with_limits`). There is no JS step budget. Stop runaway scripts with the `kataan::interrupt` watchdog (`nbvm::execute_typed_interruptible`).
 
 ## goro-rs
 
-**Repo:** https://github.com/KarpelesLab/goro-rs · **Crate:** `goro` binary + `goro-*` workspace crates (git only; the crates.io `goro` is an unrelated project) · **License:** MIT (per Cargo.toml; no LICENSE file in repo) · **Status:** experimental (28.5% of the PHP 8.5.4 test suite passes, 6067/21281)
+**Repo:** https://github.com/KarpelesLab/goro-rs · **Crate:** `goro` binary + `goro-*` workspace crates (git only; the crates.io `goro` is an unrelated project) · **License:** none declared (no LICENSE file, and the workspace Cargo.toml has no `license` field) · **Status:** active, clean-room rewrite (94.0% of the php-src 8.5.4 tests that run pass: 18,149 pass, 1,160 fail, 2,263 skipped, as of 2026-11-02)
 
-A PHP 8.5 interpreter in Rust: hand-written lexer/parser, bytecode compiler, and register VM. OOP, traits, enums, namespaces, closures, generators, exceptions, readonly, property hooks, lazy objects, Reflection, SPL, DateTime, a hand-written PCRE-compatible regex engine, and 500+ builtins are implemented. Extensions are separate crates registered on the VM.
+A clean-room implementation of PHP 8.5 in Rust, written from scratch on 2026-10-28 from PHP's documentation, specifications and black-box behaviour. The earlier code base, written with php-src as a reference, is kept on the `old` branch and is out of bounds for the new one. It covers classes, enums, closures, generators, fibers, attributes, references, exceptions, output buffering, streams, SPL, Reflection and serialization, with a CGI SAPI (`goro --cgi`, or run as `php-cgi`). The rule is pure Rust with no C or FFI to C libraries (the `libc` crate for syscalls is allowed); dependencies are mostly KarpelesLab crates (`purecrypto` 0.10, `graphitesql` for PDO/sqlite3, `puremp` for gmp/bcmath).
 
-**Use it when:** you need to run self-contained PHP scripts or snippets without a system PHP, or you want a PHP parser/VM to embed in Rust.
-**Don't use it when / limits:** you need production PHP compatibility. Fibers, the pipe operator, stream wrappers/file resources, `strict_types` enforcement, and most extensions (PDO etc.) are missing. It is not dependency-free despite the README's goal: extensions pull in `regex`, `tokio`, `ureq`, `mysql_async`, `sha2`, `flate2`, and others.
+**Use it when:** you need to run PHP scripts without a system PHP, run the php-src `.phpt` suite against a PHP binary, or embed a PHP engine in Rust.
+**Don't use it when / limits:** you need full php-src parity today, or PHP's speed on call-heavy code: on the repo's `bench/` scripts goro takes 1.2-5.8x PHP 8.5's time (function calls are the slowest). There is no opcache optimizer or JIT, and phpdbg tests are skipped. The API is internal and unstable.
 
 **Install / run:**
 ```sh
 git clone https://github.com/KarpelesLab/goro-rs && cd goro-rs
-cargo build --release                       # binary: target/release/goro (edition 2024)
+cargo build --release                       # binary: target/release/goro
 ./target/release/goro script.php
 ./target/release/goro -r 'echo PHP_VERSION, "\n";'   # "<?php " is prepended
-./target/release/goro --test /path/to/php-src/tests/ # PHPT runner
+./target/release/goro --test -q -j 8 --results new.txt /path/to/php-src/tests   # .phpt runner
+./target/release/goro --test-compare base.txt new.txt                          # regressions
 ```
 
-**Workspace crates:** `goro-parser` (Lexer, Parser), `goro-core` (Compiler, Vm, values), `goro-vfs`, `goro-sapi`, `goro-phpt`, and `goro-ext-{standard,date,json,ctype,hash,openssl,zlib,gmp,bz2,curl,xml,session,mysqli,sockets,mbstring,spl,reflection}`.
+**Workspace crates:** `goro-engine` (compiler, VM, the `goro` binary's entry points), `goro-syntax` (lexer, parser, AST; tokens match `token_get_all()`), `goro-runtime` (values, arrays, objects, conversions), `goro-phpt`, `goro-regex` (PCRE2 10.46-compatible), `goro-charset` (mbstring/iconv), `goro-xml`, and `goro-ext-{standard,date,json,hash,openssl,zlib,gmp,bcmath,curl,intl,sqlite,zip,phar,gd,exif,sodium,random,filter,fileinfo,uri,tidy}`.
 
-**Example (embedding; mirrors `src/main.rs`):**
+**Example (embedding; verified to compile and print `HI`):**
 ```rust
-use goro_core::{compiler::Compiler, vm::Vm};
-use goro_parser::{Lexer, Parser};
+use goro_engine::{RunOptions, Script};
 
-let src = b"<?php echo strtoupper('hi'), PHP_EOL;";
-let tokens = Lexer::new(src).tokenize();
-let program = Parser::new(tokens).parse().expect("parse");
-let mut compiler = Compiler::new();
-let (op_array, classes, _warnings) = compiler.compile(&program).expect("compile");
-let mut vm = Vm::new();
-goro_ext_standard::register_standard_functions(&mut vm);
-goro_ext_json::register(&mut vm); // register only the extensions you need
-for c in classes { vm.register_class(c); }
-vm.execute(&op_array).expect("run");
-let output: Vec<u8> = vm.take_output(); // stdout is buffered in the VM
+// Like `goro -r`: "<?php " is prepended and output goes to stdout. Returns the exit status.
+let status: i32 = goro_engine::run(RunOptions::new(Script::Code(b"echo strtoupper('hi'), PHP_EOL;".to_vec())));
 ```
+`Script` also has `File(Vec<u8>)` and `Stdin`. `RunOptions` has `ini` (`-d name=value` pairs), `args`, `modules: Vec<&'static Module>` and `lines`. For a lower-level start, `goro_engine::startup(ini, modules) -> Vm` returns a VM with the extensions registered.
 
 **Gotchas:**
-- Depend on the crates by git (`goro-core = { git = "https://github.com/KarpelesLab/goro-rs" }` etc.). The API is internal and unstable.
-- The CLI sets a hard 2 GB `RLIMIT_AS` on Unix at startup. An embedder has to impose its own limits.
+- Depend on the crates by git (`goro-engine = { git = "https://github.com/KarpelesLab/goro-rs" }`). Code written against the old `goro-core`/`goro-parser` crates no longer builds; those crates exist only on the `old` branch.
+- No license is declared anywhere in the repo; ask before redistributing.
 
 ## mathesis
 
@@ -192,9 +188,9 @@ let r = mathesis::evaluate("1/2 + 1/3");   // {"ok":true,"text":"5/6","tex":"\\f
 
 ## puregit
 
-**Repo:** https://github.com/KarpelesLab/puregit · **Crate:** `puregit` (git only; Cargo version `0.0.1`) · **License:** MIT OR Apache-2.0 · **Status:** usable (clones GitHub byte-identically; puregit-made history passes `git fsck`; roadmap milestones complete)
+**Repo:** https://github.com/KarpelesLab/puregit · **Crate:** `puregit` (crates.io `0.0.2`) · **License:** MIT · **Status:** usable (clones GitHub byte-identically; puregit-made history passes `git fsck`; roadmap milestones complete)
 
-A from-scratch git in Rust, in the spirit of libgit2: objects (SHA-1/SHA-256), loose + packed ODB with deltas, pack read/write, refs/packed-refs/reflog, index v2/v3, config, porcelain (`add`/`rm`/`mv`/`commit`/`status`/`branch`/`checkout`/`merge`/`diff`/`reset`/`gc`/`fsck`/worktrees), Git LFS, and the smart protocol as **client and server** over HTTP(S) (`rsurl`), SSH (`puressh`), and `git://`. The core is `no_std + alloc`, filesystem access goes through a `Vfs` trait, and the protocols are sans-IO. There is no C and no `*-sys` crate.
+A from-scratch git in Rust, in the spirit of libgit2: objects (SHA-1/SHA-256), loose + packed ODB with deltas, pack read/write, refs/packed-refs/reflog, index v2/v3, config, porcelain (`add`/`rm`/`mv`/`commit`/`status`/`branch`/`checkout`/`merge`/`diff`/`reset`/`gc`/`fsck`/worktrees), Git LFS, index v4, SHA-256 repositories, and the smart protocol (including protocol v2 push) as **client and server** over HTTP(S) (`rsurl`), SSH (`puressh`), and `git://`. The core is `no_std + alloc`, filesystem access goes through a `Vfs` trait, and the protocols are sans-IO. There is no C and no `*-sys` crate.
 
 **Use it when:** an agent or tool needs to create commits, inspect history, or clone/fetch/push without shelling out to `git` or linking libgit2. It also fits cases where you need to serve git (upload-pack/receive-pack handlers) or run git logic over an in-memory VFS.
 **Don't use it when / limits:** you need the full breadth of git porcelain (rebase, interactive tools, etc.). OpenPGP keyring management is a stated non-goal. The API is pre-1.0.
@@ -202,7 +198,7 @@ A from-scratch git in Rust, in the spirit of libgit2: objects (SHA-1/SHA-256), l
 **Add it:**
 ```toml
 [dependencies]
-puregit = { git = "https://github.com/KarpelesLab/puregit", features = ["http"] }
+puregit = { version = "0.0.2", features = ["http"] }   # MSRV 1.95
 ```
 
 **Cargo features:** default `std, client`. Optional: `http` (smart-HTTP over rsurl), `ssh` (over puressh), `server` (upload-pack/receive-pack), `signing` (SSHSIG verify), `ffi` (libgit2-shaped C ABI), `full`. `--no-default-features` gives the `no_std` core.
@@ -227,16 +223,16 @@ println!("{}", cloned.head_id()?);
 ```
 Also: `Repository::open`, `read_object`, `head_id`, `refs()`, `index()`, `create_branch`, `checkout`, `reset`, `repack`, `prune`, and `client::{fetch, push(repo, transport, local_ref, remote_ref)}`. For SSH, use `transport::ssh::SshTransport::from_url(url, HashAlgo::Sha1)` with `.with_password()` or `.with_key(path, passphrase)`.
 
-**CLI:** `cargo install --git https://github.com/KarpelesLab/puregit --features http,ssh` installs a binary named **`git`** (commands include `init`, `add`, `commit`, `log`, `status`, `branch`, `checkout`, `merge`, `diff`, `tag`, `clone`, `gc`, `fsck`, `lfs`, `cat-file`, `rev-parse`). Note that it will shadow system git on `PATH`. The CLI has no `fetch`/`push` commands; use the library for those.
+**CLI:** `cargo install puregit --features http,ssh` installs a binary named **`puregit`** (commands include `init`, `add`, `rm`, `mv`, `commit`, `log`, `show`, `status`, `branch`, `checkout`, `switch`, `reset`, `merge`, `diff`, `tag`, `worktree`, `clone`, `gc`, `fsck`, `lfs`, `cat-file`, `rev-parse`). The CLI has no `fetch`, `push` or `pull` commands (only `lfs pull`); use the library's `client::{fetch, push}` for those. Interop is tested against git and libgit2.
 
 ## fstool
 
-**Repo:** https://github.com/KarpelesLab/fstool · **Crate:** `fstool` (crates.io `0.4.35`) · **License:** MIT · **Status:** production-ready for most formats (outputs are cross-validated against `e2fsck`, `fsck.vfat`, `xfs_repair`, `qemu-img`, `cryptsetup`, `sgdisk`). API is unstable until 0.5
+**Repo:** https://github.com/KarpelesLab/fstool · **Crate:** `fstool` (crates.io `0.5.2`) · **License:** MIT · **Status:** production-ready for most formats (outputs are cross-validated against `e2fsck`, `fsck.vfat`, `xfs_repair`, `qemu-img`, `cryptsetup`, `sgdisk`). MSRV 1.95
 
-Build, inspect, modify, and convert disk images and filesystem images entirely in userspace, **without root, loop devices, or mounts**. Read/write support: ext2/3/4, FAT12/16/32, exFAT, XFS, NTFS, HFS+, HFS, APFS (partial), F2FS, AFFS, littlefs, SquashFS, ISO 9660, GRF, tar, zip, cpio, ar. Read-only: cab, 7z, rar5, lha, arc, sit, lzx. Partition tables: MBR, GPT, Apple Partition Map (read). Containers: qcow2 (read/write, compression, backing files, encryption), LUKS1/2 (read/write/create), DMG (read). All dependencies are pure Rust (`compcol`, `purecrypto`). There is also a browser app at https://karpeleslab.github.io/fstool/.
+Build, inspect, modify, and convert disk images and filesystem images entirely in userspace, **without root, loop devices, or mounts**. Read/write support: ext2/3/4, FAT12/16/32, exFAT, XFS, NTFS, HFS+, HFS, APFS (partial), F2FS, AFFS, littlefs, SquashFS, cramfs, ISO 9660, UDF, GRF, tar, zip (including encryption and split volumes), cpio, ar. Read-only: cab, 7z, rar5, lha, arc, sit, lzx. Partition tables: MBR, GPT, Apple Partition Map (read). Containers: qcow2 (read/write, compression, backing files, encryption), LUKS1/2 (read/write/create), DMG (read; writes UDRO/UDCO/UDZO/UDBZ/ULMO/ULFO and encrypted `encrcdsa` v2), `.sparseimage`/`.sparsebundle` (read/write/create). All dependencies are pure Rust (`compcol`, `purecrypto`). There is also a browser app at https://karpeleslab.github.io/fstool/.
 
 **Use it when:** an agent needs to produce a bootable/partitioned disk image from a directory or TOML spec, look inside an image or archive, copy files in or out, convert between formats (e.g. ext4 ↔ tar, OCI-style layer merge with whiteouts), or do all of this in memory from Rust.
-**Don't use it when / limits:** see the README "Limitations" section. Highlights: ext4 writer has no `flex_bg`; APFS in-place edits are whole-file and not `fsck_apfs`-clean; the NTFS reader lacks compressed/encrypted `$DATA`; DMG is read-only; the F2FS/SquashFS/ISO writers are build-once.
+**Don't use it when / limits:** see the README "Limitations" section. Highlights: ext4 writer has no `flex_bg`; APFS in-place edits are whole-file and not `fsck_apfs`-clean; the NTFS reader lacks compressed/encrypted `$DATA`; DMG encrypted v1 (`cdsaencr`) is unsupported and the UDIF writer emits single-segment, unencrypted images (segmenting and encryption are separate operations); the F2FS/SquashFS/ISO writers are build-once.
 
 **Install (CLI):**
 ```sh
@@ -250,12 +246,12 @@ fstool repack in.img out.tar      ;  fstool repack base.tar patch.tar flat.tar
 fstool convert disk.img disk.qcow2 ;  fstool analyze ./dir --json
 fstool create -t ext4 --size 1G -o s.img tree/ --encrypt --password-file pw   # LUKS2
 ```
-Other commands: `shell` (an SFTP-like REPL with `find`/`grep`; it needs a TTY, so avoid it in agent automation), `dd` (ddrescue-style copy), `resources` (HFS resource forks), `mount` (ext via FUSE; needs the `fuse` feature). Block devices (`/dev/sdX`) require `--force`.
+Maintenance commands (0.5): `check`, `verify`, `checksum`, `resize-fs`, `resize`, `compact`, `reclaim`, `segment`/`join`, `udif-derez`/`udif-rez`, `unsign`, and `makehybrid` (hybrid ISO/HFS images). Other commands: `shell` (an SFTP-like REPL with `find`/`grep`; it needs a TTY, so avoid it in agent automation), `dd` (ddrescue-style copy), `resources` (HFS resource forks), `mount` (ext via FUSE; needs the `fuse` feature). Block devices (`/dev/sdX`) require `--force`.
 
 **Add it (library, no CLI deps):**
 ```toml
 [dependencies]
-fstool = { version = "0.4", default-features = false, features = ["filesystems", "containers", "codecs"] }
+fstool = { version = "0.5", default-features = false, features = ["filesystems", "containers", "codecs"] }
 ```
 
 **Cargo features:** one per format (`ext`, `fat`, `exfat`, `ntfs`, `xfs`, `apfs`, `hfs-plus`, `iso9660`, `squashfs`, `tar`, `archive`, `qcow2`, `luks`, `dmg`, …), bundles `filesystems`/`containers`/`codecs`, plus `spec` (TOML), `json`, `cli`, `wasm`, `fuse`. `fat`, `exfat`, and `littlefs` work in `no_std` without an allocator (embedded SD/flash drivers).
@@ -277,24 +273,23 @@ ws.add_file("/boot/config.txt", b"arm_64bit=1\n".to_vec())?;
 std::fs::write("sd.img", ws.export()?)?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
-Also `fstool::memconv::probe(&[u8])` (reports compression, partition table, and FS kind) and the low-level `fstool::block::FileBackend` + `fstool::fs::ext::Ext::format_with` (see `examples/format_empty_ext2.rs`).
+Option structs and enums are `#[non_exhaustive]` since 0.5.1, so construct them through their builders or `Default` rather than struct literals. Also `fstool::memconv::probe(&[u8])` (reports compression, partition table, and FS kind) and the low-level `fstool::block::FileBackend` + `fstool::fs::ext::Ext::format_with` (see `examples/format_empty_ext2.rs`).
 
 ## cadlab
 
-**Repo:** https://github.com/KarpelesLab/cadlab · **Crate:** `cadlab` (crates.io `0.0.1`; library plus `cadlab` binary) · **License:** MIT · **Status:** pre-alpha by version number, but broad in practice. Roadmap milestones M0–M5, M8 and M9 are done, and most of M6/M7. The README "Status" paragraph is stale: it says only `project.*` exists, but there are 149 commands. MSRV 1.89.
+**Repo:** https://github.com/KarpelesLab/cadlab · **Crate:** `cadlab` (crates.io `0.0.2`; library plus `cadlab` binary) · **License:** MIT · **Status:** pre-alpha by version number, but broad in practice. Roadmap milestones M0–M5, M8 and M9 are done, and most of M6/M7. The README "Status" paragraph is stale: it says only `project.*` exists, but there are about 169 commands. MSRV 1.95.
 
 Headless electronics CAD (EDA), built to be **driven by programs and AI agents**. It covers parts and BOM, circuit (netlist-first), ERC, auto-generated schematic, board, placement, autorouting, DRC, and fab outputs, with no GUI. The only visual output is rendering (PNG/SVG, isometric 3D). Every operation is a typed, JSON-Schema-described command in one **command registry**. The Rust library, the CLI and the MCP server are thin layers over that registry, so names, arguments, validation and errors are identical on all three. Coordinates are integer nanometres, and output is deterministic byte for byte (the router is seeded). Polygon geometry comes from [`polyclip`](i18n-math.md#polyclip). The code is clean-room: KiCad and freerouting are used only as external test oracles, never as code sources.
 
 **Use it when:** an agent or script has to produce a manufacturable PCB end to end, or one stage of it (ERC, autoroute, DRC, Gerber/IPC-2581 export, fab-rule checks, BOM costing), without driving a GUI. It also fits when you need to import KiCad boards or netlists into a scriptable pipeline.
 **Don't use it when / limits:**
 - You need interactive editing, or KiCad-grade completeness for schematic capture. There is no `.kicad_sch` import: circuits come in as netlists, and schematics are always derived.
-- `.kicad_sym`/`.kicad_mod` library import is not done yet.
-- The router is a grid A* router with negotiated congestion, shove, fanout and gridless refinement. Its stated goal is parity with freerouting, which is still in progress.
+- The router combines grid maze routing with a gridless shape-based search under negotiated congestion (`router: grid|gridless|auto`, default `auto`: grid first, then gridless for what is left), plus shove and fanout. Its stated goal is parity with freerouting, which is still in progress.
 - ODB++ is intentionally not implemented (licence terms). Use IPC-2581.
 
 **Install / run:**
 ```sh
-cargo install cadlab            # or prebuilt binaries: GitHub release v0.0.1 (linux x86_64/aarch64, macOS universal, Windows)
+cargo install cadlab            # or prebuilt binaries: GitHub release v0.0.2 (linux x86_64/aarch64, macOS universal, Windows)
 claude mcp add cadlab -- cadlab mcp      # register as an MCP server (stdio)
 ```
 
@@ -329,14 +324,15 @@ These generic entry points work on every command:
 
 `--json` prints exactly one object: `{"ok":true,"command","output","diagnostics"}` or `{"ok":false,"error":{"kind","code","message","subjects","hint"}}`. The `hint` field carries "did you mean" suggestions. Exit codes: `0` ok, `1` command error, `2` usage, `3` completed with ERC/DRC/check errors.
 
-**Command groups** (149 commands; run `cadlab describe` for the full list):
-- Project and library: `project`, `part` (`generic`, `create`, `search`), `footprint` (IPC-7351B `generate`, 3D `model_set`), `lib` (shared user libraries), `catalog`.
+**Command groups** (about 169 commands; run `cadlab describe` for the full list):
+- Project and library: `project`, `part` (`generic`, `create`, `search`, `import_kicad_sym`), `footprint` (IPC-7351B `generate`, `import_kicad`, 3D `model_set`), `lib` (shared user libraries, `import_kicad`), `catalog`.
 - Circuit: `circuit` (`add`, `erc`, `lint`, `summary`, `export`, `import` from a KiCad netlist), `net`, `netclass`, `diffpair`, `lengthgroup`, `block` (reusable sub-circuits).
 - Sourcing: `bom` (`resolve`, `check`, `cost`, `substitutes`, `export`).
-- Board: `board` (`setup`, `outline`, `rules`, `stackup`, `hole`, `cutout`, `import_kicad`, `export_kicad`), `place` (`auto`, `near`, `align`, ...), `track`, `via`, `zone`, `keepout`, `impedance`, `current`.
+- Board: `board` (`setup`, `outline`, `rules`, `stackup`, `hole`, `cutout`, `import_kicad`, `export_kicad`), `place` (`auto`, `near`, `align`, ...), `track`, `via`, `zone`, `keepout`, `impedance` (`calc`, and `solve` to fit a net class's width to a target impedance), `current`.
 - Routing and checks: `route` (`all`, `nets`, `fanout`, `diffpair`, `tune`, `import_ses`), `drc`.
 - Output: `render` (`schematic`, `board`, `board3d`, `footprint`, `symbol`), `schematic` (`export` to `.kicad_sch`).
-- Export: `export` (`gerber`, `drill`, `pnp`, `ipc356`, `ipc2581`, `step`, `idf`, `idx`, `dsn`, `spice`, `all`).
+- Export: `export` (`gerber`, `drill`, `pnp`, `ipc356`, `ipc2581`, `step`, `idf`, `idx`, `dsn`, `spice`, `all`; master adds `openems`).
+- Simulation (master only, after the 0.0.2 release): `sim sparams` runs cadlab's built-in FDTD full-wave solver over a board region (stack, copper, vias, lumped ports, CPML) and writes a Touchstone file. `export openems` writes the same region as an openEMS model, which [`ems`](#ems) can run.
 - Fab: `fab` (`list`, `check`, `compare`, `export`, `substitute`).
 - Built-in fab profiles: jlcpcb, pcbway, oshpark, aisler, eurocircuits, seeed, nextpcb, pcbgogo, allpcb, elecrow, generic. You can add your own in `~/.config/cadlab/fab-profiles`.
 
@@ -349,7 +345,7 @@ These generic entry points work on every command:
 **Library:**
 ```toml
 [dependencies]
-cadlab = { version = "0.0.1", default-features = false }   # drop CLI/network/PNG/rayon/3D-model deps
+cadlab = { version = "0.0.2", default-features = false }   # drop CLI/network/PNG/rayon/3D-model deps
 serde_json = "1"
 ```
 ```rust
@@ -377,14 +373,172 @@ for (cmd, args) in [
 s.save()?;
 ```
 
-**Cargo features:** the defaults are `cli` (clap and rpassword, needed for the binary), `net` (ureq for the DigiKey, Mouser and Nexar supplier APIs), `png` (tiny-skia; SVG needs no feature), `parallel` (rayon plus `polyclip/rayon`) and `models3d` (STL/OBJ/glTF/USDZ import through `oxideav-mesh3d`).
+**Cargo features:** the defaults are `cli` (clap and rpassword, needed for the binary), `net` (ureq for the DigiKey, Mouser and Nexar supplier APIs), `png` (tiny-skia; SVG needs no feature), `parallel` (rayon plus `polyclip/rayon`) and `models3d` (STL/OBJ/glTF/USDZ import through `oxideav-mesh3d`; master adds STEP and VRML).
 
 **Gotchas:**
 - `docs/INTERFACES.md` shows the *target* CLI, and some of its examples do not run. `cadlab erc` is really `cadlab circuit erc`, `board outline rect 50mm 30mm` is `board outline --width 50mm --height 30mm`, and `route --all` is `route all`. The `p.bom().add(..)` wrapper API in that file does not exist yet; use `run` or `Registry::execute`. Trust `cadlab describe`.
 - Part IDs in the library use underscores (`LED_red_0603`). Mistyped names fail with a hint such as ``did you mean `LED_red_0603`?``.
 - Supplier research (`part.search`, `bom.resolve/check/cost`, `fab check --parts`) needs providers. Configure them with `cadlab config digikey|mouser|nexar`, with environment variables (`DIGIKEY_CLIENT_ID`/`_SECRET`, `MOUSER_API_KEY`, `NEXAR_CLIENT_ID`/`_SECRET`), or with offline JSON catalogs (`CADLAB_CATALOGS`, `~/.config/cadlab/catalogs/*.json`, `catalog.import` for a JLCPCB/LCSC CSV). `CADLAB_OFFLINE=1` serves only cached answers. Credentials are never stored in the project.
 - A project is a git-friendly directory: `cadlab.toml`, `circuit.json`, `board.json`, `bom.json` and `library/`. `.cadlab/` holds caches and undo history, and `out/` holds generated files. Fab-specific choices go only in `out/fab/<fab>/fab-lock.json`.
-- cadlab depends on `polyclip = "0.0.2"`, an exact pin under 0.0.x rules, while polyclip itself is at `0.0.4`.
+- crates.io cadlab 0.0.2 requires `polyclip ^0.0.4` (an exact pin under 0.0.x rules) while master uses 0.0.6, so a project that also depends on polyclip directly gets two copies unless the versions match.
+- `sim.sparams` uses cadlab's own FDTD engine, not `ems`; the two share the openEMS model description, not code.
+
+## ems
+
+**Repo:** https://github.com/KarpelesLab/ems · **Crate:** `ems` (crates.io `0.0.5`; library plus the `ems`, `ems-nf2ff` and `ems-sar-calc` binaries) · **License:** MIT · **Status:** early development (milestones 1–4 done; parity with openEMS checked against a black-box openEMS; API still changing). MSRV 1.95
+
+A clean-room FDTD (finite-difference time-domain) electromagnetic field solver, written as a replacement for [openEMS](https://openems.de). Models come from its companion crate [`csx`](#csx); `ems` adds mesh compilation, time stepping, boundaries (PEC/PMC, Mur, CPML, periodic/Bloch), sources and plane waves, lumped elements, probes, ports (lumped, microstrip, CPW, stripline, coax, rectangular/circular waveguide) with S-parameters and Z_in, field dumps, NF2FF far fields and SAR. Cartesian and cylindrical grids are supported. The `ems` binary takes openEMS's command line, so scripts that call `openEMS` (including its Python and Octave wrappers) can call `ems` instead. `unsafe` is forbidden. The README reports 1.5–10x openEMS's speed on vacuum/PML boxes and results within 1e-7…1e-3 of openEMS on its end-to-end fixtures.
+
+**Use it when:** you need antenna, microstrip, filter or waveguide simulation from Rust or a script with no C++ toolchain, or you want to run existing openEMS XML models unchanged.
+**Don't use it when / limits:** you need a stable API (0.0.x, early development), or features the status table marks missing: rectangular-waveguide ports on cylindrical grids, lossy backgrounds around an NF2FF box, and openEMS's tolerance for polyhedron surfaces within 1e-3 of a cell. It has one engine; `--engine=sse` and friends are accepted but run the same code.
+
+**Add it:**
+```toml
+[dependencies]
+ems = "0.0.5"     # default feature `xml` runs openEMS XML files
+csx = "0.0.2"     # must be the same csx version ems uses, or the model types won't match
+```
+
+**Cargo features:** `xml` (default; openEMS XML via `csx/xml`), `hdf5` (HDF5 field dumps and probes through the pure-Rust [`hdf5rs`](data-formats.md#hdf5rs); also required by the `ems-nf2ff` and `ems-sar-calc` binaries), `hdf5-deflate` (gzip-compressed datasets).
+
+**CLI (drop-in `openEMS`):**
+```sh
+cargo install ems --features hdf5      # installs ems, ems-nf2ff, ems-sar-calc
+ems model.xml --numThreads=8           # writes openEMS's probe files and VTK/HDF5 dumps to the current directory
+ems model.xml --no-simulation --debug-PEC   # same debug and statistics options as openEMS
+```
+
+**Example (README quick start; verified to compile and run):**
+```rust
+use csx::primitives::BoxShape;
+use csx::{ContinuousStructure, Primitive, Property};
+use ems::prelude::*;
+
+let mut model = ContinuousStructure::new();
+model.grid.delta_unit = 1e-3; // drawing unit: mm
+model.grid.set_lines(0, (0..=40).map(f64::from))?;
+model.grid.set_lines(1, (0..=40).map(f64::from))?;
+model.grid.set_lines(2, (0..=20).map(f64::from))?;
+let sub = model.add_property(Property::material("sub", csx::Material::new(4.3, 0.0)));
+model.add_primitive(sub, Primitive::new(BoxShape::new([10., 10., 0.], [30., 30., 2.])))?;
+let patch = model.add_property(Property::metal("patch"));
+model.add_primitive(patch, Primitive::new(BoxShape::new([14., 14., 2.], [26., 26., 2.])))?;
+let port = LumpedPort::new(1, 50.0, [17., 20., 0.], [17., 20., 2.], Axis::Z)
+    .excite(1.0)
+    .add_to(&mut model)?;
+
+let fdtd = Fdtd::new()
+    .waveform(Waveform::gaussian(2e9, 1e9))
+    .boundaries(Boundaries::all(Boundary::pml(8)).with(Face::ZMin, Boundary::Pec))
+    .end_criteria(EndCriteria::energy_decay_db(-40.0));
+let mut sim = Simulation::new(&model, &fdtd)?;
+for w in sim.warnings() { eprintln!("warning: {w}"); } // solver-aware mesh checks
+let res = sim.run()?;
+let z_in = port.analyze(&res, &[1e9, 2e9, 3e9])?.z_in(); // Vec<Complex64>
+```
+Run an openEMS XML file from Rust with `Simulation::from_xml`, or `cargo run --release --example run_xml -- model.xml --out DIR` in the repo (probes as CSV, dumps as `.vtr`).
+
+**Gotchas:**
+- Build and run with `--release`, as the README's commands do.
+- Pin `csx` to the version `ems` depends on (`0.0.2` for ems 0.0.5). A git `csx` next to a crates.io `ems` gives two incompatible `ContinuousStructure` types.
+- [`cadlab`](#cadlab)'s `sim sparams` has its own FDTD engine; `export openems` is how a cadlab board region reaches `ems`.
+
+## csx
+
+**Repo:** https://github.com/KarpelesLab/csx · **Crate:** `csx` (crates.io `0.0.2`) · **License:** MIT · **Status:** usable, pre-1.0. MSRV 1.95
+
+The geometry and material model under [`ems`](#ems): a clean-room, zero-dependency library compatible with CSXCAD (openEMS's model format). It has primitives (box, sphere, cylinder and shells, polygon, extruded and revolved polygon, curve, wire, point, polyhedron from STL/PLY, expression-defined regions) with transformations and Cartesian/cylindrical coordinates; materials (anisotropic, position-weighted, Drude/Lorentz/Debye dispersive), metals, conducting sheets, excitations, probes, dumps and lumped elements; parametric values; priority-based point queries; rectilinear grids with automatic meshing; CSXCAD/openEMS XML read and write; tessellation and STL/PLY/VTK export; and discretisation onto the FDTD grid.
+
+**Use it when:** you need to read, write, build or query CSXCAD/openEMS models, mesh a structure, or export it to STL/VTK, with or without running a simulation.
+**Don't use it when / limits:** you need CSXCAD's exact bounding-box clipping of cylindrical wires (csx keeps the true geometry, a documented divergence).
+
+**Add it:**
+```toml
+[dependencies]
+csx = "0.0.2"                                          # default feature `xml`
+# csx = { version = "0.0.2", default-features = false } # no XML reader/writer
+```
+
+**Example (README; verified to compile and run):**
+```rust
+use csx::primitives::BoxShape;
+use csx::properties::Material;
+use csx::{ContinuousStructure, CoordSystem, Property, TypeMask, Vec3};
+
+let mut model = ContinuousStructure::new();
+let fr4 = model.add_property(Property::material("FR4", Material::new(4.3, 0.0)));
+model.add_primitive(fr4, BoxShape::new([-10.0, -10.0, 0.0], [10.0, 10.0, 1.6])).unwrap();
+
+let xml = model.to_xml_string();                        // feature `xml`
+let model = ContinuousStructure::from_xml_str(&xml).unwrap();
+let hit = model.property_at(Vec3::new(0.0, 0.0, 0.5), CoordSystem::Cartesian, TypeMask::ANY);
+assert_eq!(hit.unwrap().property.name, "FR4");
+```
+Repo examples: `info` (summarise a file), `patch_antenna` (build and mesh a parametric antenna), `export_vtk`, `discretize`.
+
+## guide
+
+**Repo:** https://github.com/KarpelesLab/guide · **Crate:** `guide` (git only; crates.io `0.0.0` is the empty scaffold) · **License:** MIT · **Status:** pre-alpha. Roadmap milestones M0–M2 and M4 are done, M3 (FPGA routing) is largely in; PCB routing (M5) and placement (M7+) are not started. MSRV 1.95
+
+A placement and routing engine meant to be shared across every problem that reduces to connecting terminals through contended resources: PCBs, FPGAs, ASIC global routing, multi-agent path finding. Today it has the core model (nets, terminals, a `RoutingSpace` abstraction with grid and explicit-graph spaces), Dijkstra/A* with reusable search state, Steiner trees, a negotiated-congestion (PathFinder) multi-net engine with rip-up and reroute, deterministic parallel routing, budgets and cancellation, partial results with failure reports, and an independent validator that shares no code with the router. The `fpga` feature imports VTR routing-resource graphs, architectures and placed designs, with static timing analysis and timing-driven routing. The `pcb` feature adds a geometry layer over [`polyclip`](i18n-math.md#polyclip) (clearances, spatial index, design rules, DRC), and `kicad` reads KiCad boards for clearance checks, agreeing with KiCad 10's DRC on 3448 of its 3450 findings on the curated boards. `unsafe` is forbidden; results are identical across thread counts and platforms.
+
+**Use it when:** you need a deterministic multi-net router over a grid or graph you define, VTR-style FPGA routing, or an exact PCB clearance check against KiCad boards.
+**Don't use it when / limits:** you need PCB routing or placement (not implemented; [`cadlab`](#cadlab) has a working PCB autorouter today), a CLI (planned for 1.0), or a stable API.
+
+**Add it:**
+```toml
+[dependencies]
+guide = { git = "https://github.com/KarpelesLab/guide" }                          # core engine
+# guide = { git = "https://github.com/KarpelesLab/guide", features = ["fpga"] }   # VTR import + timing
+# guide = { git = "https://github.com/KarpelesLab/guide", features = ["kicad"] }  # geometry + KiCad boards (implies pcb)
+```
+
+**Example (two nets negotiating around a wall on a 2-layer grid; verified to compile and run):**
+```rust
+use guide::engine::{route, EngineOptions};
+use guide::id::NetId;
+use guide::net::{Net, Terminal};
+use guide::space::grid::Grid;
+
+let mut grid = Grid::new(16, 16, 2)?;                       // width, height, layers
+for y in 2..14 { grid.set_blocked(8, y, 0, true)?; }
+let t = |x, y| Terminal::at(grid.node_at(x, y, 0).unwrap()); // node_at returns Option
+let nets = vec![
+    Net { id: NetId(0), terminals: vec![t(1, 8), t(14, 8)] },
+    Net { id: NetId(1), terminals: vec![t(8, 0), t(8, 15)] },
+];
+let outcome = route(&grid, &nets, EngineOptions::default())?;
+assert!(outcome.is_success());                              // also: outcome.routes, total_cost, overused
+```
+`route_parallel`, `route_timed` and `route_timed_parallel` are the threaded and timing-driven variants; `guide::validate::check(space, nets, &outcome.routes)` re-checks a result independently. `Grid::builder(w, h, layers)` sets connectivity and orthogonal/diagonal/via costs.
+
+**Gotchas:**
+- The crates.io release is the M0 scaffold and its README still says "empty scaffold"; depend on git.
+
+## nanami
+
+**Repo:** https://github.com/KarpelesLab/nanami · **Crate:** `nanami` (git only; Cargo.toml has no description, license or repository fields) · **License:** MIT (LICENSE file) · **Status:** early research prototype (v0.1)
+
+A physically based speech and singing synthesizer: instead of a neural network it simulates the lungs, vocal folds and a moving vocal tract (Liljencrants–Fant glottal source, Kelly–Lochbaum waveguide at 96 kHz with a nasal branch, Bernoulli airflow and turbulence noise). It is driven by NML, a small markup language designed for language models to write directly: text or IPA, emotion, prosody, voice quality and melody (`docs/NML.md` is written to be pasted into an LLM's system prompt). English and Japanese, singing, and MIDI input are supported. Audio I/O uses OxideAV crates (WAV, FLAC, playback, MIDI, spectrogram PNG). Voices: `nanami` (default), `female`, `male`, `child`.
+
+**Use it when:** an agent needs offline, dependency-light speech or singing output where every parameter is interpretable, or you are experimenting with articulatory synthesis.
+**Don't use it when / limits:** you need natural-sounding or highly intelligible speech. The README's Whisper-measured word error rate is about 31% (UTMOS 2.53, against about 4 for natural speech). Onset clusters and some stops are often misheard, kanji are not converted (give kana or IPA), and changing voice mid-document starts a new run with no cross-fade.
+
+**Install / run:**
+```sh
+git clone https://github.com/KarpelesLab/nanami && cd nanami
+cargo run --release -- say "Hello! <happy>I'm Nanami.</happy> My name is /ˈnɑnəmi/." -o hello.wav
+cargo run --release -- say "<ja>こんにちは、ななみです。</ja>" --play
+cargo run --release -- say '<sing tempo="90">twinkle@C4,C4 twinkle@G4,G4 little@A4,A4 star@G4:2</sing>' -o star.flac
+cargo run --release -- midi song.mid --lyrics "la la la" -o song.wav
+cargo run --release -- phonemes "I can't believe it's 2026!"
+```
+
+**Library:** `nanami::render_markup(src: &str, voice: &Voice, lang: Lang) -> Rendered` (`Rendered { audio: Vec<f32>, sample_rate, warnings }`), with `nanami::voice::Voice::nanami()` / `Voice::by_name("male")`, `nanami::ipa::Lang::{English, Japanese, Generic}`, and `nanami::audio_io::{write_audio, play}` for output.
+
+**Gotchas:**
+- The repo commits a 10 MB espeak-ng Python wheel (used by the evaluation tools), so clones are heavier than the code suggests.
+- Run it with `cargo run --release`, as the README does.
 
 ## origami
 

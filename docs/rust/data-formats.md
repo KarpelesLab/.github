@@ -1,6 +1,6 @@
 # Compression, Encodings & Data Formats
 
-Pure-Rust codecs and format libraries with little or no dependency baggage. For compression there are two current crates, each for a different job. [`compcol`](#compcol) is the full-featured one: 40+ algorithms (deflate/gzip/zlib, zstd, brotli, xz/LZMA, bzip2, LZ4, RAR/StuffIt/LHA decoders, ...) behind one streaming trait, `no_std` + `alloc`, zero deps. Its `embed` mode builds the deflate family (gzip/zlib/raw deflate) for microcontrollers, with no heap, no panics and a few KB of code; it absorbed the former [`minizlib`](#minizlib) crate, which is now deprecated. [`minlz`](#minlz-rs) is the pick when you need byte-for-byte compatibility with Go's `klauspost/compress/s2` (Snappy-family) or MinIO's MinLZ, or very fast decoding. For data formats, [`emjson`](#emjson) fills the embedded JSON niche: it streams, parses, writes and edits in place in a few hundred bytes of RAM with no allocator, while `serde_json` needs a heap. [`tomlproc`](#tomlproc) is a zero-dependency TOML 1.1 parser/serializer. [`charcode`](#charcode) converts text encodings per WHATWG with no deps and no `unsafe`, [`anyd`](#anydcode) encodes and decodes 1D/2D barcodes, and [`xuid-rs`](#xuid-rs) provides type-prefixed base32 UUIDs.
+Pure-Rust codecs and format libraries with little or no dependency baggage. For compression there are two current crates, each for a different job. [`compcol`](#compcol) is the full-featured one: 40+ algorithms (deflate/gzip/zlib, zstd, brotli, xz/LZMA, bzip2, LZ4, RAR/StuffIt/LHA decoders, ...) behind one streaming trait, `no_std` + `alloc`, zero deps. Its `embed` mode builds the deflate family (gzip/zlib/raw deflate) for microcontrollers, with no heap, no panics and a few KB of code; it absorbed the former [`minizlib`](#minizlib) crate, which is now deprecated. [`minlz`](#minlz-rs) is the pick when you need byte-for-byte compatibility with Go's `klauspost/compress/s2` (Snappy-family) or MinIO's MinLZ, or very fast decoding. For data formats, [`emjson`](#emjson) fills the embedded JSON niche: it streams, parses, writes and edits in place in a few hundred bytes of RAM with no allocator, while `serde_json` needs a heap. [`tomlproc`](#tomlproc) is a zero-dependency TOML 1.1 parser/serializer. [`charcode`](#charcode) converts text encodings per WHATWG with no deps and no `unsafe`, [`anyd`](#anydcode) encodes and decodes 1D/2D barcodes, [`xuid-rs`](#xuid-rs) provides type-prefixed base32 UUIDs, and [`hdf5rs`](#hdf5rs) reads and writes HDF5 scientific data files without `libhdf5`, using `compcol` for its compression filters.
 
 **Choosing a compressor:**
 - **compcol** (standard build): you need a format other than deflate, a format picked at runtime (factory/magic-byte detection), `std::io`/tokio adapters, decompression of legacy archive codecs, or good gzip ratio (lazy matching + dynamic Huffman). Needs `alloc`.
@@ -12,7 +12,8 @@ Pure-Rust codecs and format libraries with little or no dependency baggage. For 
 |------|-----|
 | gzip/zlib/zstd/brotli/xz/bzip2/lz4 etc. through one API, `no_std` + alloc | [`compcol`](#compcol) |
 | Choose a codec by name at runtime / sniff a compressed stream's format | [`compcol`](#compcol) (`factory`) |
-| Decompress RAR 2/3/5, StuffIt, LHA, LZX/CAB, Quantum, PPMd, LZFSE | [`compcol`](#compcol) |
+| Decompress RAR 2/3/5, StuffIt, LHA, LZX/CAB, Quantum, PPMd; encode/decode LZFSE, LZF | [`compcol`](#compcol) |
+| zlib-style tuning: levels, strategies, preset dictionaries, partial flush | [`compcol`](#compcol) (`deflate`/`zlib`/`gzip`) |
 | HTTP/2 HPACK or HTTP/3 QPACK header compression | [`compcol`](#compcol) |
 | gunzip/gzip on a microcontroller with no heap, a few KB of flash | [`compcol`](#compcol) (`embed` feature) |
 | Stream-decompress an OTA/firmware image from UART to flash | [`compcol`](#compcol) (`embed::flate`) |
@@ -23,15 +24,16 @@ Pure-Rust codecs and format libraries with little or no dependency baggage. For 
 | Convert Shift_JIS / Big5 / windows-1252 / EBCDIC ... to/from UTF-8 | [`charcode`](#charcode) |
 | Generate or read QR / Data Matrix / EAN / Code 128 / PDF417 barcodes | [`anyd`](#anydcode) |
 | Type-prefixed, sortable, base32 IDs compatible with Go `xuid` | [`xuid-rs`](#xuid-rs) |
+| Read/write HDF5 (`.h5`) files without libhdf5: hyperslabs, compounds, chunked + compressed datasets | [`hdf5rs`](#hdf5rs) |
 
 ## compcol
 
-**Repo:** https://github.com/KarpelesLab/compcol · **Crate:** `compcol` (crates.io `0.7.2`) · **License:** MIT · **Status:** usable (566+ tests, cross-validated against reference tools; fuzz targets)
+**Repo:** https://github.com/KarpelesLab/compcol · **Crate:** `compcol` (crates.io `0.7.8`) · **License:** MIT · **Status:** usable (566+ tests, cross-validated against reference tools; fuzz targets)
 
-A collection of compression algorithms in pure Rust behind one caller-buffered streaming trait (`Encoder`/`Decoder`/`Algorithm`). It is `#![no_std]` and `#![forbid(unsafe_code)]`, has zero runtime dependencies (tokio only with the `tokio` feature), and gates each algorithm behind its own cargo feature. MSRV 1.88, edition 2024.
+A collection of compression algorithms in pure Rust behind one caller-buffered streaming trait (`Encoder`/`Decoder`/`Algorithm`). It is `#![no_std]` and `#![forbid(unsafe_code)]`, has zero runtime dependencies (tokio only with the `tokio` feature), and gates each algorithm behind its own cargo feature. MSRV 1.95, edition 2024.
 
 **Use it when:** you need any mainstream or legacy compression format, want the format chosen from config or a CLI flag, need `Read`/`Write` or tokio `AsyncRead`/`AsyncWrite` adapters, or have to decompress untrusted input with an output cap.
-**Don't use it when / limits:** in a no-allocator build only `rle` and the `embed` deflate family are available. zstd and brotli encoders produce conformant streams but lag the reference ratio. Some codecs are decode-only (`Error::Unsupported` on encode): RAR 1-5 (license), Quantum, LZFSE, PPMd, StuffIt methods. RAR1 does not decode either. LZX/Amiga LZX encoders emit uncompressed blocks only. This crate handles codec streams, not archive containers (no zip/rar/7z directory parsing).
+**Don't use it when / limits:** in a no-allocator build only `rle` and the `embed` deflate family are available. zstd and brotli encoders produce conformant streams but lag the reference ratio. Some codecs are decode-only (`Error::Unsupported` on encode): RAR 1-5 (license), Quantum, PPMd, StuffIt methods. (LZFSE encodes since 0.7.7.) RAR1 does not decode either. LZX/Amiga LZX encoders emit uncompressed blocks only. This crate handles codec streams, not archive containers (no zip/rar/7z directory parsing).
 
 **Add it:**
 ```toml
@@ -44,9 +46,11 @@ compcol = "0.7"                                        # default: alloc, rle, de
 
 **Key features / cargo features:**
 - Capability features: `alloc`, `std` (`compcol::io`: `EncoderWriter`, `EncoderReader`, `DecoderWriter`, `DecoderReader`), `tokio` (same four names in `compcol::tokio_io`), `factory` (`encoder_by_name`, `decoder_by_name`, `names`, `extension`, `detect`), `checksum` (public Adler-32/CRC-32).
-- Algorithm features: `deflate`, `deflate64`, `zlib`, `gzip`, `lzma`, `xz`, `lzma2`, `zstd`, `brotli`, `lz4`, `lz5`, `snappy`, `lzw`, `lzss`, `bzip2`, `lzo`, `lzx`, `amiga_lzx`, `quantum`, `lzfse`, `adc`, `ppmd`, `xpress`, `xpress_huffman`, `lznt1`, `lzham`, `lzs`, `packbits`, `lha`, `zip_implode`/`zip_shrink`/`zip_reduce`, `arc_*`, `sit13`/`lzah`/`arsenic`, `rar1`-`rar5`, filters `bcj`/`bcj2`/`delta`, primitives `huffman`/`rangecoder`/`mtf`/`bwt`, and `hpack`/`qpack`. The `all` feature enables everything.
+- Algorithm features: `deflate`, `deflate64`, `zlib`, `gzip`, `lzma`, `xz`, `lzma2`, `zstd`, `brotli`, `lz4`, `lz5`, `lzf` (liblzf raw format), `snappy`, `lzw`, `lzss`, `bzip2`, `lzo`, `lzx`, `amiga_lzx`, `quantum`, `lzfse`, `adc`, `ppmd`, `xpress`, `xpress_huffman`, `lznt1`, `lzham`, `lzs`, `packbits`, `lha`, `zip_implode`/`zip_shrink`/`zip_reduce`, `arc_*`, `sit13`/`lzah`/`arsenic`, `rar1`-`rar5`, filters `bcj`/`bcj2`/`delta`, primitives `huffman`/`rangecoder`/`mtf`/`bwt`, and `hpack`/`qpack`. The `all` feature enables everything.
 - One-shot helpers in `compcol::vec`: `compress_to_vec`, `decompress_to_vec`, `*_with(config)`, and `decompress_to_vec_capped` (bomb-safe, returns `Error::OutputLimitExceeded`). `compcol::limit::LimitedDecoder` wraps any decoder with a cap.
 - `Decoder::skip(input, n)` advances through decompressed output without emitting it.
+- zlib-level control for the deflate family (0.7.8): levels 0-9 (0 = stored), `deflate::Strategy` (`Default`, `Filtered`, `HuffmanOnly`, `Rle`, `Fixed`), memory level and window bits through `deflate::EncoderConfig` and `Encoder::with_deflate_config`, preset dictionaries (`zlib::Encoder::with_dictionary`; the decoder returns `Error::NeedDictionary` until you call `set_dictionary`), and partial/block flushes.
+- Other recent additions: zstd accepts libzstd's negative "fast" levels and a configurable window limit (0.7.4); xz decodes concatenated streams and Delta/BCJ filter chains and verifies CRC64/SHA-256 checks (0.7.4); the bzip2 encoder output is byte-identical to libbzip2; an LZFSE encoder (0.7.7); and ZIP method 14 (LZMA) and 98 (PPMd variant I) entry codecs (0.7.8).
 - `embed` is a mode, not an algorithm: it rebuilds the deflate family (`gzip`, `zlib`, `deflate`) as heap-free variants under the same paths and traits. It adds one-shot `gzip::decompress`, `gzip::decompressed_len` and `gzip::compress` (caller-provided table), `const`-constructible streaming codecs that can live in a `static` (`gzip::Decoder` with a 32 KiB window, `gzip::WindowedDecoder::<N>`, `gzip::Encoder`, `gzip::BlockEncoder::<B, T>`), and `compcol::embed::flate`, the former `minizlib` API (`gunzip`, `Reader`, `Stream`, `Decompressor`, `Compressor`). CI holds gzip streaming decode to about 4 KB of code and 352 B of stack on Cortex-M4.
 - `compcol` CLI binary (`cargo install compcol --features all`), a gzip(1)-style filter with `-t ALGO`, `-d` and auto-detection.
 
@@ -70,7 +74,7 @@ let mut dec = compcol::factory::decoder_by_name("gzip").expect("compiled in");
 
 **Gotchas:**
 - The trait methods return `Result<(Progress, Status), Error>`, a tuple. Loop until `Status::StreamEnd` on `finish()`.
-- The README's install snippets say `version = "0.6"`, but crates.io is at 0.7.2. Use `0.7`.
+- The README's install snippets say `version = "0.6"`, but crates.io is at 0.7.8. Use `0.7`.
 - Cargo features unify, so enabling `embed` anywhere in a dependency graph switches every user of compcol in that graph to the small deflate variants (lower ratio, no sync flush, no preset dictionaries). Enable it only in firmware binaries, never in a library. `--all-features` turns it on; `all` does not.
 - `EncoderWriter` finishes on `Drop` on a best-effort basis. Call `.finish()` explicitly to see errors.
 - `factory::detect` does not detect brotli or raw `.lzma` (they have no magic bytes). It only reports codecs that were compiled in.
@@ -352,3 +356,72 @@ let a = Xuid::from_key_prefix("resource-name", "res"); // deterministic
 - The crate name is `xuid-rs`, but `use xuid::...`. The crate's `repository` metadata points at the Go repo `KarpelesLab/xuid`.
 - The prefix is clipped to 5 characters and lowercased only when rendering. The full prefix is retained, so two IDs that differ only in prefix case compare unequal but print the same.
 - `from_key` always uses the `utref` prefix and a fixed namespace.
+
+## hdf5rs
+
+**Repo:** https://github.com/KarpelesLab/hdf5rs · **Crate:** `hdf5rs` (crates.io `0.0.1`, MSRV 1.95) · **License:** MIT · **Status:** pre-1.0, the API may still change. Reading is broad (all datatypes, every layout and chunk index, common filters, virtual datasets); writing covers the common cases. Files it writes are checked against h5py in CI.
+
+A clean-room reader and writer for [HDF5](https://www.hdfgroup.org/solutions/hdf5/) files with no `libhdf5`, no C toolchain and `#![forbid(unsafe_code)]`. It has zero required dependencies; the compression filters come from [`compcol`](#compcol) behind cargo features. It reads files produced by the reference library, h5py and other tools, and writes files they can read. It can also modify existing files in place. In the KLB stack it is the field-dump I/O for the [`ems`](https://github.com/KarpelesLab/ems) electromagnetic solver.
+
+**Use it when:**
+- You need to read or write `.h5` / `.hdf5` files (scientific data, ML weights and datasets, simulation dumps) from Rust without linking `libhdf5`, including for static or cross-compiled builds.
+- You need hyperslab reads, compound or variable-length types, attributes, or chunked and compressed datasets.
+
+**Don't use it when / limits:**
+- You need parallel HDF5 / MPI-IO, or writer support for non-default file drivers (family, split, direct, ROS3); these are out of scope.
+- You need byte-for-byte identical output to the reference library.
+- The blosclz codec inside Blosc is not supported. There is no `ndarray` integration or derive macro for compound types yet, and the parsing core is not `no_std`.
+
+**Add it:**
+```toml
+[dependencies]
+hdf5rs = "0.0.1"                                            # default filters: deflate, lzf
+# hdf5rs = { version = "0.0.1", features = ["all-filters"] }  # + zstd, lz4, bzip2, blosc, bitshuffle
+# hdf5rs = { version = "0.0.1", default-features = false }    # zero dependencies, no compression filters
+```
+
+**Key features / cargo features:**
+- Filters: `deflate` (default, id 1), `lzf` (default, id 32000, common in h5py output), `zstd`, `lz4`, `bzip2`, `blosc`, `bitshuffle`, or `all-filters`. Shuffle, Fletcher-32, N-bit and scale-offset are always built in. `parallel` decodes the chunks of one read on several threads.
+- Reading: `File::open` / `File::from_bytes`, `file.root()?.members()`, `file.dataset(path)`, then `read::<T>()`, `read_nd::<T>()` (data plus shape), `read_selection(&Selection::from_ranges(..))` for hyperslabs, `read_values()` for compounds and variable-length data as `Value`, and `attribute(name)?.read_scalar()`.
+- Writing: `write::FileWriter::create(path)`, groups via `create_group`, attributes via `set_attr`, and datasets via the `new_dataset::<T>(name)` builder (`.shape`, `.chunk`, `.shuffle`, `.deflate(level)`, `.write(&data)`), then `finish()`.
+- Editing: `FileWriter::open_rw(path)` modifies an existing file: `unlink`, `delete_attr`, `write_selection` into a dataset, and `resize` on chunked datasets (within their maximum dimensions).
+- Custom codecs: implement `filters::Filter` and register it in a `FilterRegistry` (or `FileWriter::register_filter`).
+- Examples in the repo: `cargo run --example h5ls -- -v -d file.h5` prints a tree view of a file.
+
+**Example** (write then read back; compiled and run against the current repo):
+```rust
+use hdf5rs::write::FileWriter;
+use hdf5rs::{File, Selection};
+
+fn main() -> hdf5rs::Result<()> {
+    let mut f = FileWriter::create("out.h5")?;
+    let mut root = f.root();
+    root.set_attr("title", "example")?;
+    let mut g = root.create_group("weather")?;
+    let mut ds = g
+        .new_dataset::<f64>("temperature")
+        .shape(&[2, 3])
+        .write(&[20.5, 21.0, 21.5, 22.0, 22.5, 23.0])?;
+    ds.set_attr("units", "celsius")?;
+    g.new_dataset::<i32>("counts")
+        .shape(&[1000])
+        .chunk(&[100])
+        .shuffle()
+        .deflate(6)
+        .write(&(0..1000).collect::<Vec<i32>>())?;
+    f.finish()?;
+
+    let file = File::open("out.h5")?;
+    let temps = file.dataset("/weather/temperature")?;
+    let grid = temps.read_nd::<f64>()?; // grid.data, grid.shape == [2, 3]
+    let row0: Vec<f64> = temps.read_selection(&Selection::from_ranges(&[0..1, 0..3]))?;
+    let units: String = temps.attribute("units")?.read_scalar()?;
+    println!("{:?} {row0:?} {units}", grid.shape);
+    Ok(())
+}
+```
+
+**Gotchas:**
+- Version 0.0.1 is the only release so far, and the repo has had no commits since 2026-10-19. Pin the exact version; pre-1.0 releases may break the API.
+- Filters are compiled in by feature. Reading a dataset whose filter you didn't enable (for example zstd from h5py's `hdf5plugin`) fails with "filter id N is not available" (unless the filter was marked optional in the file), so enable `all-filters` when you read files from unknown sources.
+- The writer does not produce SWMR-compatible files yet.

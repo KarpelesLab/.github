@@ -39,7 +39,6 @@ Interpreters, shells, and runtime environments.
 - **[goro-rs](https://github.com/KarpelesLab/goro-rs)** - PHP interpreter in Rust
 - **[rustygo](https://github.com/KarpelesLab/rustygo)** - Go → Rust compiler with a Rust runtime (GC, scheduler, channels, reflect) — design stage
 - **[lode](https://github.com/KarpelesLab/lode)** - Lode systems programming language: safety without lifetimes, no runtime, comptime (early development)
-- **[gsh](https://github.com/KarpelesLab/gsh)** - Go native shell replacement
 - **[nodejs](https://github.com/KarpelesLab/nodejs)** - Node.js factory and pool for Go
 
 ### AI & Developer Tools
@@ -48,8 +47,10 @@ Tooling built around AI-assisted development.
 - **[teamclaude](https://github.com/KarpelesLab/teamclaude)** - Multi-account Claude proxy with automatic quota-based rotation
 - **[cterm](https://github.com/KarpelesLab/cterm)** - Terminal emulator optimized for AI coding tools
 - **[mcprun](https://github.com/KarpelesLab/mcprun)** - MCP server runner
+- **[mcptk](https://github.com/KarpelesLab/mcptk)** - Build MCP servers in Rust over stdio, Streamable HTTP and WebSocket, with tasks, OAuth and Claude Code channels
 - **[carl](https://github.com/KarpelesLab/carl)** - Local MCP server that gives AI agents hands: Google account access (Gmail, Calendar, Drive…), agent-to-agent messaging, with Carl as the trust boundary (formerly manu)
 - **[atelier](https://github.com/KarpelesLab/atelier)** - Minimal-TUI AI coding harness in Rust for OpenAI-compatible APIs
+- **[oxinfer](https://github.com/KarpelesLab/oxinfer)** - LLM, diffusion, speech and embedding inference in pure Rust: SIMD CPU, Metal/CUDA/WebGPU detected at run time ([demo](https://karpeleslab.github.io/oxinfer/))
 - **[aipencil](https://github.com/KarpelesLab/aipencil)** - Render structured JSON scene descriptions to deterministic SVG/PNG
 - **[nixvm](https://github.com/KarpelesLab/nixvm)** - Portable sandbox running a real Linux userland by emulating syscalls, not hardware
 - **[bnpm](https://github.com/KarpelesLab/bnpm)** - Sandboxed package manager using Linux namespaces
@@ -69,10 +70,13 @@ A growing family of pure-Rust implementations — no C, no FFI, often `no_std`. 
 - **[fstool](https://github.com/KarpelesLab/fstool)** - Build, inspect, convert, and repack disk images and filesystems
 - **[origami](https://github.com/KarpelesLab/origami)** - Experimental first-principles protein folder (all-atom MD, GPU-accelerated via wgpu)
 - **[cadlab](https://github.com/KarpelesLab/cadlab)** - Headless electronics CAD for programs and AI agents: parts, circuits, boards, autorouting, DRC, fab outputs (CLI + MCP)
+- **[guide](https://github.com/KarpelesLab/guide)** - Placement and routing engine shared across PCBs, FPGAs and other routing problems (pre-alpha)
+- **[ems](https://github.com/KarpelesLab/ems)** - FDTD electromagnetic field solver, a drop-in replacement for openEMS (early development)
 
 **Systems & toolchain**
 - **[kintane](https://github.com/KarpelesLab/kintane)** - Modular OS kernel, from no-MMU microcontrollers to multi-socket SMP
 - **[purestd](https://github.com/KarpelesLab/purestd)** - A Rust `std` that never calls libc — direct kernel syscalls all the way down
+- **[dldota](https://github.com/KarpelesLab/dldota)** - Load system shared libraries from static or libc-free binaries by booting the system's own ld.so
 - **[rustlibc](https://github.com/KarpelesLab/rustlibc)** - Full libc in Rust with C bindings, a drop-in for glibc or musl
 - **[latticefoundry](https://github.com/KarpelesLab/latticefoundry)** - Clean-room compiler back-end framework (SSA IR, codegen, object files, linker core)
 - **[qld](https://github.com/KarpelesLab/qld)** - Fast parallel linker, drop-in for GNU ld / gold / lld / mold
@@ -96,11 +100,14 @@ A growing family of pure-Rust implementations — no C, no FFI, often `no_std`. 
 - **[noroi](https://github.com/KarpelesLab/noroi)** - Rich curses-style terminal UI with zero external crates
 - **[stipple](https://github.com/KarpelesLab/stipple)** - Self-drawn, themeable cross-platform UI toolkit (desktop, mobile, web)
 - **[ldtray](https://github.com/KarpelesLab/ldtray)** - Cross-platform tray icons with no compile-time GUI linkage
+- **[dlsym](https://github.com/KarpelesLab/dlsym)** - Memory-safe dlopen/LoadLibrary with a C header → Rust bindings generator
 - **[rawusb](https://github.com/KarpelesLab/rawusb)** - Dependency-free cross-platform USB access in the spirit of libusb (Linux, macOS, Windows)
 - **[rsupd](https://github.com/KarpelesLab/rsupd)** - Signed release distribution and in-place auto-updates (successor to goupd)
 - **[cacrt](https://github.com/KarpelesLab/cacrt)** - `no_std` curated CA root certificates by OpenSSL subject hash
 - **[psl2](https://github.com/KarpelesLab/psl2)** - Fast `no_std` Public Suffix List with built-in IDNA
 - **[polyclip](https://github.com/KarpelesLab/polyclip)** - Exact integer 2D polygon geometry: booleans, offsetting, arcs, distance queries, triangulation
+- **[csx](https://github.com/KarpelesLab/csx)** - CSXCAD/openEMS-compatible geometry and material modeling, zero dependencies
+- **[hdf5rs](https://github.com/KarpelesLab/hdf5rs)** - HDF5 file reader and writer, no libhdf5, no `unsafe`
 
 ### Databases & SQL
 Database toolkits and storage engines.
@@ -144,11 +151,17 @@ Secure implementations for authentication, HSM, and post-quantum cryptography.
 - **[tpmlib](https://github.com/KarpelesLab/tpmlib)** - TPM (Trusted Platform Module) support
 - **[vncpasswd](https://github.com/KarpelesLab/vncpasswd)** - VNC password encryption/decryption
 
+**Hardware security research**
+- **[ledger_nano_x_pads](https://github.com/KarpelesLab/ledger_nano_x_pads)** - Interactive map of the Ledger Nano X board: test pads, traced nets, KiCad reconstruction ([view](https://karpeleslab.github.io/ledger_nano_x_pads/))
+- **[ledger_nano_re](https://github.com/KarpelesLab/ledger_nano_re)** - Reverse engineering of the original Ledger Nano (ST23YT66): X-rays, die photos, bond-wire map, USB/HID notes
+- **[ledger_implant_osint](https://github.com/KarpelesLab/ledger_implant_osint)** - Tracker of publicly reported hardware-wallet implant cases with archived sources ([site](https://karpeleslab.github.io/ledger_implant_osint/))
+- **[ledger_implant_detector](https://github.com/KarpelesLab/ledger_implant_detector)** - Concept handheld detector for antenna implants in hardware wallets (capacitive array + RF loop; not yet built)
+
 ### Blockchain & Wallets
 Multi-chain wallet infrastructure, signing, and cryptographic primitives.
 
 - **[libwallet](https://github.com/KarpelesLab/libwallet)** - Multi-chain mobile wallet library with TSS — Ethereum, Bitcoin, Solana, NFTs
-- **[tss-lib](https://github.com/KarpelesLab/tss-lib)** / **[tsslib-rs](https://github.com/KarpelesLab/tsslib-rs)** - Threshold signature schemes, wire-compatible (Go / Rust)
+- **[tsslib-rs](https://github.com/KarpelesLab/tsslib-rs)** - `no_std` threshold signatures: FROST (incl. secp256k1/Taproot), DKLs23 ECDSA, threshold ML-DSA
 - **[outscript](https://github.com/KarpelesLab/outscript)** / **[outscript-rs](https://github.com/KarpelesLab/outscript-rs)** - Output scripts, addresses and transaction signing across many networks (Go / Rust)
 - **[ethrpc](https://github.com/KarpelesLab/ethrpc)** / **[ethrpc-rs](https://github.com/KarpelesLab/ethrpc-rs)** - Ethereum JSON-RPC client (Go / Rust)
 - **[erigon-seg](https://github.com/KarpelesLab/erigon-seg)** - Read, query, write and merge Erigon 3 seg state files
@@ -182,6 +195,7 @@ Multimedia processing libraries — pure Rust and pure Go, no C dependencies whe
 - **[static-portaudio](https://github.com/KarpelesLab/static-portaudio)** - PortAudio static for Go
 - **[gogd](https://github.com/KarpelesLab/gogd)** - PHP gd image operations in native Go (no cgo, no libgd)
 - **[mblur](https://github.com/KarpelesLab/mblur)** - ImageMagick's motionBlur ported to Go
+- **[nanami](https://github.com/KarpelesLab/nanami)** - Articulatory speech and singing synthesizer (simulated vocal tract, not neural) driven by LLM-friendly markup (research prototype)
 
 ### Data Formats & Parsing
 Parsers and serializers for various data formats.
@@ -212,12 +226,14 @@ Tools for building multilingual applications.
 Libraries for interacting with hardware devices.
 
 - **[streamdeck](https://github.com/KarpelesLab/streamdeck)** - Elgato StreamDeck API
-- **[hid](https://github.com/KarpelesLab/hid)** - Pure Go HID driver (no CGO)
 - **[pixoo64](https://github.com/KarpelesLab/pixoo64)** - Pixoo64 LED display library
 - **[usbmagic](https://github.com/KarpelesLab/usbmagic)** - Library and CLI for programmable USB test instruments (Cynthion), with [FPGA gateware](https://github.com/KarpelesLab/usbmagic-gateware)
+- **[visgrok](https://github.com/KarpelesLab/visgrok)** - Driver, recorder, protocol decoders and TUI/web UI for Sipeed SLogic logic analyzers (sigrok-compatible)
+- **[scopecap](https://github.com/KarpelesLab/scopecap)** - Live microscope capture and multi-zoom mosaic stitching, with a pure-Rust ToupTek USB3 camera driver
 - **[selecard](https://github.com/KarpelesLab/selecard)** - Reverse-engineered protocol and tool for the SeleCard III 426 MHz garage remote
 - **[kwi](https://github.com/KarpelesLab/kwi)** - Unpack and repack LOADING.KWI firmware of Toyota/Lexus (Panasonic/Aisin AW) navigation head units
-- **[odeck](https://github.com/KarpelesLab/odeck)** - Open-hardware USB-C dock (KiCad): 10 Gbps + DisplayPort, 140 W charging, SD, 2.5 GbE, RP2350 status display (design stage)
+- **[odock](https://github.com/KarpelesLab/odock)** - Open-hardware USB-C deck (KiCad): 10 Gbps + DisplayPort, 140 W pass-through charging, SD, 2.5 GbE, RP2350 status LCD; USB4 planned (routing in progress)
+- **[multivolt](https://github.com/KarpelesLab/multivolt)** - Open-hardware USB-C PD breadboard power supply (dual 1.2–5 V rails, OCP) and DIP level translator (KiCad, generated from Python)
 - **[intel-dcapd](https://github.com/KarpelesLab/intel-dcapd)** - Intel DCAP daemon
 
 ### Frontend & Web
@@ -233,6 +249,12 @@ JavaScript/TypeScript libraries for web development.
 Tools for 3D content and Apple's Universal Scene Description format.
 
 - **[usdpython](https://github.com/KarpelesLab/usdpython)** - Apple's usdzconvert and USD tools (our most starred Python repo!)
+
+### Other Tools
+Small utilities outside the main ecosystems.
+
+- **[klbtoo](https://github.com/KarpelesLab/klbtoo)** - Gentoo overlay for KarpelesLab packages (purecrypto, rsurl, puressh as an OpenSSH replacement)
+- **[makstat](https://github.com/KarpelesLab/makstat)** - macOS menu-bar system monitor and widget grouping processes by executable, with auto-kill rules
 
 ### Go Utilities
 General-purpose Go libraries and tools.
@@ -253,7 +275,7 @@ General-purpose Go libraries and tools.
 
 ## Technology Focus
 
-Our 240+ repositories are predominantly written in:
+Our 260+ repositories are predominantly written in:
 
 - **Go** - Cloud infrastructure, networking, crypto, language runtimes, and utilities, including [portablesql](https://github.com/portablesql)
 - **Rust** - A fast-growing pure-Rust ecosystem (browser, JS engine, SQLite, kernel, toolchain, crypto, networking), including the [OxideAV](https://github.com/OxideAV) media stack

@@ -11,6 +11,8 @@ A foreign-code-free security and networking stack. It is rooted in **`purecrypto
 
 HTTP/2 HPACK, HTTP/3 QPACK and all compression come from the sibling crate `compcol`.
 
+**System packages:** on Gentoo, the [klbtoo](https://github.com/KarpelesLab/klbtoo) overlay packages `dev-libs/purecrypto`, `net-misc/rsurl` and `net-misc/puressh` (`eselect repository add klbtoo git https://github.com/KarpelesLab/klbtoo.git`, then `emaint sync -r klbtoo`). Its `net-misc/puressh` installs the OpenSSH program names and replaces `net-misc/openssh`. puressh also has a signed apt repository for Ubuntu ([below](#puressh)).
+
 ## Quick pick
 | Need | Use |
 |------|-----|
@@ -24,13 +26,13 @@ HTTP/2 HPACK, HTTP/3 QPACK and all compression come from the sibling crate `comp
 | Embeddable HTTP/HTTPS server (h1/h2/h3, ACME), or a static file server CLI | [`httpsd`](#httpsd) |
 | HTTP(S) client, curl-like CLI, many protocols (FTP, SFTP, WS, ...) | [`rsurl`](#rsurl) |
 | Userspace packet plumbing: virtual L2/L3, NAT, TCP stack, WireGuard, TUN/TAP, AF_XDP | [`pktkit-rs`](#pktkit-rs) |
-| DNS message parsing/building, zero-copy, `no_std`, DNSSEC sign/verify | [`dnsbox`](#dnsbox) |
+| DNS message parsing/building, zero-copy, `no_std`, DNSSEC, TSIG, UPDATE, zone transfers, zone files | [`dnsbox`](#dnsbox) |
 | End-to-end encrypted messaging over the Spot network | [`spotlib-rs`](#spotlib-rs) |
 | Signed releases plus in-place self-update for a Rust binary | [`rsupd`](#rsupd) |
 
 ## purecrypto
 
-**Repo:** https://github.com/KarpelesLab/purecrypto · **Crate:** `purecrypto` (crates.io `0.9.9`) · **License:** MIT · **Status:** usable, pre-1.0, broad test coverage (the full Wycheproof suite, NIST ACVP vectors, OpenSSL 3.5 interop). No third-party human audit, not FIPS validated.
+**Repo:** https://github.com/KarpelesLab/purecrypto · **Crate:** `purecrypto` (crates.io `0.10.4`, MSRV 1.95) · **License:** MIT · **Status:** usable, pre-1.0, broad test coverage (the full Wycheproof suite, NIST ACVP vectors, OpenSSL 3.5 interop). No third-party human audit, not FIPS validated.
 
 A cryptography toolkit written entirely in Rust, with no C, no assembly and no third-party crypto crates. It covers constant-time primitives, bignum, RSA/EC/PQC, ASN.1/DER, X.509, TLS 1.2/1.3, DTLS 1.2/1.3 and QUIC v1. The core is `#![no_std]`, every module has its own feature gate, and library code does not use `unsafe` (it is allowed only in the `ffi` feature). The TLS engine is **sans-I/O**: you feed and pop bytes yourself. It also ships a C ABI (which also builds for WASM) and an OpenSSL-style `purecrypto` CLI.
 
@@ -47,10 +49,10 @@ A cryptography toolkit written entirely in Rust, with no C, no assembly and no t
 **Add it:**
 ```toml
 [dependencies]
-purecrypto = "0.9"
+purecrypto = "0.10"
 # lean / no_std examples:
-# purecrypto = { version = "0.9", default-features = false, features = ["hash", "cipher"] }
-# purecrypto = { version = "0.9", default-features = false, features = ["mlkem"] }   # no alloc needed
+# purecrypto = { version = "0.10", default-features = false, features = ["hash", "cipher"] }
+# purecrypto = { version = "0.10", default-features = false, features = ["mlkem"] }   # no alloc needed
 ```
 
 **Key features / cargo features:**
@@ -61,8 +63,10 @@ purecrypto = "0.9"
   - Encodings and certificates: `der`, `x509`, `pkcs12`, `jose`.
   - Protocols: `tls`, `dtls`.
   - Post-quantum and newer schemes: `mlkem`, `mldsa`, `slhdsa`, `lms`, `xmss`, `ascon`, `aez`.
-- Opt-in features: `quic`, `hpke`, `ech`, `falcon`, `bls`, `bip340`, `ristretto255`, `zkp-*`, `hazmat-*`, `dsa`, `legacy-ec`, `legacy-ciphers`, `tls-legacy` (SSLv3/TLS 1.0/1.1, insecure), `ffi` (C ABI), `tokio` / `mio` (async TLS adapters, `tls::tokio::TlsStream`), `wasi-getrandom`.
+- Opt-in features: `quic`, `hpke`, `ech`, `falcon`, `bls`, `bn254`, `bls12-377`, `bip340`, `ristretto255`, `ec-custom` (arbitrary/custom curves), `legacy-hashes`, `zkp-*`, `hazmat-*`, `dsa`, `legacy-ec`, `legacy-ciphers`, `tls-legacy` (SSLv3/TLS 1.0/1.1, insecure), `ffi` (C ABI), `tokio` / `mio` (async TLS adapters, `tls::tokio::TlsStream`), `wasi-getrandom`.
 - The `*-table` features trade flash for speed (`ed25519-table` is about 115 KB, `p256-table` about 61 KB). Turn them off on flash-constrained targets.
+- TLS: `tls::ConfigBuilder::os_rng()` is a shorthand for using the OS RNG. TLS 1.2 renegotiation follows RFC 5746. Other 0.10 additions include OpenSSL binary curves and Salsa20 / NaCl `secretbox`.
+- `tls::pki::RootCertStore` carries a distrust list (SPKI and certificate SHA-256). `RootCertStore::with_embedded_roots()` applies `cacrt`'s blocklist automatically, so distrusted CAs and intermediates are refused even if a chain reaches a trusted root.
 - `ct` mirrors the `subtle` crate and `zeroize` mirrors the `zeroize` crate, so you can drop both dependencies.
 - The only non-std dependencies are `compcol` (under `cert-compression`), `cacrt` (under `embedded-roots`), and `tokio`/`mio` when those features are enabled.
 
@@ -157,12 +161,12 @@ let mut tpm = Tpm::new(SimulatorTransport::connect_default()?);    // swtpm on :
 The README contains a full seal/unseal flow using `Public::ecc_storage_parent`, `Public::sealed_data`, `start_hmac_session` and `Auth::Session`.
 
 **Gotchas:**
-- 0.1.0 depends on `purecrypto = "0.6"` (hash/cipher/ec/rng only). Next to a current `purecrypto` 0.9, you get two copies of `purecrypto` in your dependency tree.
+- 0.1.0 depends on `purecrypto = "0.6"` (hash/cipher/ec/rng only). Next to a current `purecrypto` 0.10, you get two copies of `purecrypto` in your dependency tree.
 - Start swtpm with `--flags startup-clear`, or call `tpm.startup(su::CLEAR)` and ignore the "already initialised" error.
 
 ## cacrt
 
-**Repo:** https://github.com/KarpelesLab/cacrt · **Crate:** `cacrt` (crates.io `0.1.2`) · **License:** MIT OR Apache-2.0 (the root data is under MPL-2.0) · **Status:** usable. It is the default trust store for `purecrypto` and `rsurl`.
+**Repo:** https://github.com/KarpelesLab/cacrt · **Crate:** `cacrt` (crates.io `0.1.4`) · **License:** MIT OR Apache-2.0 (the root data is under MPL-2.0) · **Status:** usable. It is the default trust store for `purecrypto` and `rsurl`.
 
 A curated set of trusted TLS root CAs, embedded as static DER. Roots are addressable by their OpenSSL subject hash name (e.g. `062cdee6.0`) or by the raw subject DER. The crate is `#![no_std]`, never uses `alloc`, is `#![forbid(unsafe_code)]`, and has **zero runtime dependencies**. All parsing and hashing happen in `build.rs`. The set was seeded from Mozilla NSS and is now curated by hand against CA/Browser Forum rules; see `CURATION.md` in the repo.
 
@@ -182,6 +186,7 @@ cacrt = "0.1"
 ```
 
 **Key features / cargo features:** it has no features. The API is `all()`, `len()`, `lookup(name)`, `lookup_by_hash(u32)` and `find_by_subject(&[u8])`. Each `Cert` exposes `der()`, `subject_der()`, `subject_hash()`, `seq()`, `label()` and `hash_name()`.
+- Blocklist (since 0.1.3): `blocked()`, `blocked_by_spki(&[u8; 32])` and `blocked_by_cert(&[u8; 32])` return `Blocked` entries for disabled roots and compromised intermediates, with `kind()` (`BlockedKind`: root or intermediate), `spki_sha256()`, `cert_sha256()`, `label()` and `reason()`. Use it to refuse those certificates wherever they appear in a chain; `purecrypto`'s `RootCertStore::with_embedded_roots()` already does this. 0.1.3 disabled emSign ECC Root CA - G3.
 
 **Example:**
 ```rust
@@ -194,7 +199,7 @@ for ca in cacrt::all() { let _ = ca.subject_der(); }
 
 ## psl2
 
-**Repo:** https://github.com/KarpelesLab/psl2 · **Crate:** `psl2` (crates.io `0.1.30`) · **License:** MIT OR Apache-2.0 (the PSL data is under MPL-2.0) · **Status:** production. CI republishes the crate automatically when the upstream Public Suffix List changes.
+**Repo:** https://github.com/KarpelesLab/psl2 · **Crate:** `psl2` (crates.io `0.1.38`) · **License:** MIT OR Apache-2.0 (the PSL data is under MPL-2.0) · **Status:** production. CI republishes the crate automatically when the upstream Public Suffix List changes.
 
 Mozilla's Public Suffix List as a data trie. It gives you the public suffix, the registrable domain (eTLD+1, i.e. the cookie domain), the subdomain, and whether a suffix is ICANN or PRIVATE. The core is `no_std` and **allocation-free**. There is no `build.rs` or codegen, so it compiles quickly. IDN support is built in through the `idna` crate. It is used by `rsurl`'s cookie jar.
 
@@ -235,36 +240,33 @@ assert_eq!(d.subdomain(), Some("www"));
 
 ## puressh
 
-**Repo:** https://github.com/KarpelesLab/puressh · **Crate:** `puressh` (crates.io `0.1.8`) · **License:** MIT OR Apache-2.0 · **Status:** functional, pre-1.0. It is tested against OpenSSH but has not had an independent audit.
+**Repo:** https://github.com/KarpelesLab/puressh · **Crate:** `puressh` (crates.io `0.2.8`, MSRV 1.95) · **License:** MIT · **Status:** functional, pre-1.0. It is tested against OpenSSH but has not had an independent audit.
 
-An SSH library and CLI suite in the spirit of libssh. It has a sans-I/O core (`ClientDriver`/`ServerDriver`) with blocking, `futures`, tokio and mio frontends layered on top. **All crypto comes from `purecrypto`**, using `hash, cipher, kdf, rng, rsa, dh, ec, der, mlkem` with no TLS. It has no C dependencies and no `unsafe` outside `ffi`. The protocol core builds for `no_std` + `alloc`.
+An SSH library and CLI suite in the spirit of libssh. It has a sans-I/O core (`ClientDriver`/`ServerDriver`) with blocking, `futures`, tokio and mio frontends layered on top. **All crypto comes from `purecrypto`**, using `hash, cipher, kdf, rng, rsa, dh, ec, der, mlkem` with no TLS. It has no C dependencies and no `unsafe` outside `ffi` and the runtime loaders for security-key providers and PKCS#11 modules (via `dlsym`). The protocol core builds for `no_std` + `alloc`.
 
 **Use it when:**
 - You need a programmatic SSH client: exec, shell, SFTP, SCP, `-L`/`-R` forwarding, agent/X11 forwarding.
 - You need an embedded SSH server.
-- You want PQ hybrid key exchange (`mlkem768x25519-sha256`).
+- You want PQ hybrid key exchange (`mlkem768x25519-sha256`, `mlkem768nistp256-sha256`, `sntrup761x25519-sha512`) or ML-DSA-44+Ed25519 host keys (`ssh-mldsa44-ed25519`).
+- You need FIDO security keys or PKCS#11 tokens for authentication.
 
 **Don't use it when / limits:**
 - `hostbased` and `gssapi-with-mic` auth are not supported.
-- `PermitTunnel` and external-command `Subsystem` entries are not supported.
 - The API may still change before 1.0.
 
 **Add it:**
 ```toml
 [dependencies]
-puressh = "0.1"
-# async: puressh = { version = "0.1", features = ["tokio"] }
+puressh = "0.2"
+# async: puressh = { version = "0.2", features = ["tokio"] }
+# server side: puressh = { version = "0.2", features = ["server"] }
 ```
 
 **Key features / cargo features:**
-- On by default:
-  - `std` and `alloc`.
-  - `client` and `server`.
-  - `compress`: zlib via `compcol`.
-  - `pam`: a Linux-only libpam dependency used by `sshd`. Disable default features to drop it.
-  - `multichannel`: `SharedClient`, `SftpSession`, and concurrent channels.
-- Opt-in: `async` (`AsyncClient` over `futures_io`), `tokio` (`connect_tokio`/`accept_tokio`), `mio` (`MioClient`), `ffi` (a `pcssh_*` C ABI).
-- Binaries: `ssh`, `sftp`, `scp`, `sshd` and `ssh-keygen`. They understand `ssh_config` (including `Match`/`Include`) and `known_hosts`.
+- On by default (since 0.2.0): `std`, `client`, `compress` (zlib via `compcol`), `multichannel` (`SharedClient`, `SftpSession`, concurrent channels), `knock`, `security-key` (FIDO) and `pkcs11`.
+- **Breaking in 0.2.0:** `server`, `agent` and `pam` are no longer default. Enable `server` for `ServerDriver`/`sshd` and `agent` for `ssh-agent`. `pam` (Linux) loads libpam at run time through `dlsym`, so there is no link-time libpam dependency.
+- Opt-in: `server`, `agent`, `pam`, `async` (`AsyncClient` over `futures_io`), `tokio` (`connect_tokio`/`accept_tokio`), `mio` (`MioClient`), `ffi` (a `pcssh_*` C ABI).
+- Binaries: `ssh`, `sftp`, `scp`, `ssh-keygen` and, with the matching features, `sshd` and `ssh-agent`: `cargo install puressh --features server,agent`. Ubuntu 20.04/22.04/24.04 users can instead use the signed apt repository at https://karpeleslab.github.io/puressh (`puressh-server` replaces `openssh-server`; see the README). They understand `ssh_config` (including `Match`/`Include`) and `known_hosts`.
 - `hazmat` exposes the raw protocol layers, with no stability guarantee.
 
 **Example:**
@@ -284,10 +286,12 @@ fn main() -> Result<(), puressh::Error> {
 **Gotchas:**
 - `Config::insecure()` accepts any host key. Use `Config::with_known_hosts(Arc<Mutex<KnownHosts>>)` in anything real.
 - `Client::sftp()` borrows the client. For concurrent channels, use `SharedClient` (the `multichannel` feature).
+- The README is behind: it still says "the crate is `0.0.x`" and shows `version = "0.1.4"` in its `no_std` snippet. Use `0.2`.
+- Upgrading from 0.1 with default features no longer builds the server or agent; add `features = ["server"]` / `["agent"]`.
 
 ## httpsd
 
-**Repo:** https://github.com/KarpelesLab/httpsd · **Crate:** `httpsd` (crates.io `0.1.3`) · **License:** MIT · **Status:** usable, early 0.1.x. It is verified against curl for h1, h2 and h3.
+**Repo:** https://github.com/KarpelesLab/httpsd · **Crate:** `httpsd` (crates.io `0.2.0`, MSRV 1.95) · **License:** MIT · **Status:** usable, early 0.x. It is verified against curl for h1, h2 and h3.
 
 An HTTP/1.1, HTTP/2 and HTTP/3 server. It has a sans-I/O protocol core (`proto::H1Conn`) and pluggable runtimes: a thread pool, tokio, or mio. It works as a library (a synchronous `Handler` or `Router`) or as a CLI that serves a directory or a TOML config. Components come from sibling crates:
 - **HTTPS and QUIC:** `purecrypto::tls` and `purecrypto` QUIC.
@@ -301,7 +305,7 @@ An HTTP/1.1, HTTP/2 and HTTP/3 server. It has a sans-I/O protocol core (`proto::
 
 **Don't use it when / limits:**
 - Handlers are synchronous; there are no async handler traits.
-- Request and response bodies are buffered; there is no streaming.
+- Request bodies are buffered (16 MiB cap by default, `Server::max_body_bytes`); there is no streaming request body. Responses can stream through `Body::channel()` (a `BodySender` you write from another thread) or `Body::from_file`.
 - There is no HTTP/2 server push.
 - HTTP/3 needs a static certificate; ACME certificates don't work over h3 yet.
 - ACME runs only under the thread-pool runtime.
@@ -309,8 +313,8 @@ An HTTP/1.1, HTTP/2 and HTTP/3 server. It has a sans-I/O protocol core (`proto::
 **Add it:**
 ```toml
 [dependencies]
-httpsd = "0.1"
-# lean library: httpsd = { version = "0.1", default-features = false, features = ["rt-tokio", "tls", "compress"] }
+httpsd = "0.2"
+# lean library: httpsd = { version = "0.2", default-features = false, features = ["rt-tokio", "tls", "compress"] }
 ```
 CLI: `cargo install httpsd`. Example invocations:
 - `httpsd ./public -l 0.0.0.0:8443 --self-signed`
@@ -320,6 +324,8 @@ CLI: `cargo install httpsd`. Example invocations:
 - Default: `cli`, `rt-threadpool`, `tls`, `compress`, `h2`, `h3`, `router`, `hardened-fs` (`openat2` `RESOLVE_BENEATH` on Linux).
 - `cli` implies `config`, `acme` and `privdrop`.
 - Opt-in: `rt-tokio`, `rt-mio`, `acme`, `http` (conversions to and from the `http` crate), `config`, `privdrop`.
+- Request info: `req.peer_addr()`, `req.is_secure()` and `req.conn()` (a `ConnInfo` with TLS details).
+- `Server::lenient_h1(true)` accepts sloppy HTTP/1 clients, and `Response::with_raw_head` sends a hand-built response head.
 - Runtimes: `server.run()`, `run_tokio().await`, `run_mio()`, and `run_h3()` for UDP/QUIC. To serve TCP and h3 together, run them on separate threads.
 
 **Example:**
@@ -340,10 +346,11 @@ fn main() -> httpsd::Result<()> {
 **Gotchas:**
 - With `default-features = false` you must select a runtime (`rt-*`) and `tls` yourself.
 - It depends on full-default `purecrypto`, which includes its CLI features.
+- 0.2.0 made `SessionConfig` `#[non_exhaustive]`: build it with `SessionConfig::new` and then set fields, rather than with a struct literal.
 
 ## rsurl
 
-**Repo:** https://github.com/KarpelesLab/rsurl · **Crate:** `rsurl` (crates.io `0.1.16`) · **License:** MIT · **Status:** functional across a broad protocol surface, in active development. The API may shift before 1.0.
+**Repo:** https://github.com/KarpelesLab/rsurl · **Crate:** `rsurl` (crates.io `0.1.21`) · **License:** MIT · **Status:** functional across a broad protocol surface, in active development. The API may shift before 1.0.
 
 A pure-Rust implementation of curl. It ships as a Rust library, as a C ABI (`rsurl_*`, with the `ffi` feature), and as the `rsurl` CLI. The repo also contains an unpublished `curl-compat` crate that exposes the libcurl ABI (`libcurl.so.4`).
 
@@ -395,11 +402,11 @@ let bytes = client.transfer("ftp://ftp.example.com/pub/file")?;
 **Gotchas:**
 - The README lists system CA bundle paths, but the purecrypto backend defaults to the embedded `cacrt` roots (`RootCertStore::with_embedded_roots`). Pass `--cacert` or `--capath` to use system roots.
 - SSH host keys are checked strictly against `known_hosts`: unknown host keys are rejected by default. This was a breaking change (commit 7ec59b9, released in 0.1.16). Trust-on-first-use is opt-in via `--ssh-accept-new` or `SshOptions::accept_new`.
-- The MSRV is 1.89 because `purecrypto` requires it.
+- The MSRV is 1.95 (since 0.1.17), following `purecrypto`.
 
 ## pktkit-rs
 
-**Repo:** https://github.com/KarpelesLab/pktkit-rs · **Crate:** `pktkit` (crates.io `0.1.7`) · **License:** MIT · **Status:** active development; the API is not yet stable. Most features are complete, with documented TODOs for `ovpn`, `xdp`/`afxdp` and IPv6 accept in `slirp`.
+**Repo:** https://github.com/KarpelesLab/pktkit-rs · **Crate:** `pktkit` (crates.io `0.1.11`, MSRV 1.89) · **License:** MIT · **Status:** active development; the API is not yet stable. Most features are complete, with documented TODOs for `ovpn` (tls-crypt/tls-auth), AF_XDP zero-copy, and macOS `utun`.
 
 A zero-copy L2/L3 packet toolkit and a Rust port of Go `pktkit`. `Frame` and `Packet` are `#[repr(transparent)]` wrappers over `[u8]`. It also provides typed L4 views, builders that fill in checksums, L2/L3 hubs, pipes, and synchronous callback forwarding with no async runtime.
 
@@ -412,7 +419,8 @@ The default build has **zero dependencies**. `libc` is added only for the OS int
 - You need AF_XDP capture.
 
 **Don't use it when / limits:**
-- `ovpn` lacks tls-crypt/tls-auth and control retransmit timers.
+- `ovpn` lacks tls-crypt/tls-auth and fuller PUSH_REPLY negotiation. Control retransmission, keepalives and renegotiation (soft reset) are implemented and driven by `Peer::tick`.
+- `slirp` virtual listeners (`Stack::listen`, `Stack::listen6`) drop SYNs when the accept queue is full instead of falling back to SYN cookies.
 - XDP kernel paths are only tested manually (the tests need root).
 - macOS `utun` has not been exercised on real hardware.
 
@@ -426,7 +434,7 @@ pktkit = { version = "0.1", features = ["wg", "slirp"] }   # or "full"
 - Link layer and addressing: `l2adapter` (ARP/NDP), `dhcp`.
 - Testing and debugging: `impair` (link impairment), `pcap`.
 - Host and VM interfaces: `qemu`, `tuntap`, `afpacket`, `xdp`, `afxdp`.
-- TCP/IP stacks: `vtcp` (TCP engine), `slirp` (NAT to real sockets), `vclient` (dial, listen, DNS, HTTP), `nat` (NAT44/NAT64 plus ALGs).
+- TCP/IP stacks: `vtcp` (TCP engine: CUBIC or BBRv3, RACK-TLP, SACK, AccECN, PLPMTUD, opt-in TCP Fast Open via `Tuning`), `slirp` (NAT to real sockets), `vclient` (dial, listen, DNS, HTTP), `nat` (NAT44/NAT64 plus ALGs).
 - Tunnels: `wg` (WireGuard), `ovpn` (OpenVPN server).
 - `full` enables all of the above.
 
@@ -450,38 +458,40 @@ assert_eq!(pkt.udp().unwrap().dst_port(), 53);
 
 ## dnsbox
 
-**Repo:** https://github.com/KarpelesLab/dnsbox · **Crate:** `dnsbox` (crates.io `0.0.1` is only the header scaffold, so use git) · **License:** MIT · **Status:** early development, API not stable. `ROADMAP.md` checkboxes lag behind the code. Messages, names, the builder, TCP framing and DNSSEC are already implemented; EDNS(0) options, SVCB/HTTPS, TSIG and most extra record types are not yet.
+**Repo:** https://github.com/KarpelesLab/dnsbox · **Crate:** `dnsbox` (crates.io `0.0.3`, MSRV 1.95) · **License:** MIT · **Status:** feature-complete for 1.0 per its README: every roadmap milestone is done, it is fuzzed and security-audited (`SECURITY.md`), and it is interop-tested against BIND, Knot DNS, Unbound, ldns and dnspython. Until 1.0 is tagged, 0.0.x releases may still break the API.
 
 A zero-copy DNS wire-format library that parses and builds both queries and responses. It is `#![no_std]` and `#![forbid(unsafe_code)]`, and has no dependencies in the core. A parsed `Message<'a>` is a view over your `&[u8]`, and names and RDATA are decoded lazily. `MessageBuilder` writes straight into a caller buffer (`&mut [u8]`, or a `Vec` with `alloc`) and handles name compression, section counts, size limits and RFC 2181 truncation. Parsing is hardened against hostile input. It does not panic. It bounds its work, rejecting compression-pointer loops and enforcing label and name limits. Protocol numbers (`Rtype`, `Class`, `Rcode`, ...) are open newtypes, so unknown values round-trip.
 
 **Use it when:**
 - You are writing a DNS server, resolver, proxy or packet inspector in Rust and need fast, allocation-free parsing and building, including on embedded targets or in `no_std`.
-- You need DNSSEC RRSIG verification or signing, DS digests or NSEC3 hashing without OpenSSL. These come through `purecrypto`.
+- You need DNSSEC (RRSIG verify/sign, chain of trust, NSEC/NSEC3 denial of existence, ZONEMD), TSIG, SIG(0) or TKEY without OpenSSL. The crypto comes from `purecrypto`.
+- You need dynamic UPDATE, NOTIFY, AXFR/IXFR zone transfers, or a zone-file parser (`zone::ZoneReader`).
 
 **Don't use it when / limits:**
 - It has no I/O and no resolver logic: no sockets, no recursion, no caching. You bring the transport.
-- There is no typed EDNS(0) yet. Send OPT as `UnknownRdata::new(Rtype::OPT, ..)`; see the `MessageBuilder::query` docs.
-- Typed RDATA covers A, AAAA, NS, CNAME, PTR, MX, SOA, TXT, HINFO, MINFO, WKS, NULL, MB/MD/MF/MG/MR, plus DNSSEC (DNSKEY, DS, CDS, CDNSKEY, RRSIG, SIG, KEY, NSEC, NSEC3, NSEC3PARAM, DLV, TA). Every other type comes back as `RData::Unknown` with the raw bytes.
+- About 90 record types are typed, including SVCB/HTTPS, CAA, TLSA, SSHFP, NAPTR, SRV, LOC, URI and ZONEMD. Types it doesn't know still round-trip as `RData::Unknown` with the raw bytes.
+- EDNS(0) is typed (`dnsbox::edns`): client subnet, cookies, extended DNS errors, padding, NSID, keepalive, expire, key tag, DAU and report channel.
 
 **Add it:**
 ```toml
 [dependencies]
-dnsbox = { git = "https://github.com/KarpelesLab/dnsbox" }
+dnsbox = "0.0.3"
 # no_std, no alloc:
-# dnsbox = { git = "https://github.com/KarpelesLab/dnsbox", default-features = false }
+# dnsbox = { version = "0.0.3", default-features = false }
 # DNSSEC sign/verify:
-# dnsbox = { git = "https://github.com/KarpelesLab/dnsbox", features = ["dnssec"] }
+# dnsbox = { version = "0.0.3", features = ["dnssec"] }
 ```
 
 **Key features / cargo features:**
 - `std` (default; implies `alloc`) adds `std::error::Error` and `std::io` glue. `alloc` adds owned types and `MessageBuilder::new_vec` / `query_vec` / `response_vec`.
 - `dnssec-digest` adds DS digests and NSEC3 hashing through `purecrypto/hash`. It works in `no_std` without alloc.
 - `dnssec` adds RRSIG verify/sign for RSA, ECDSA P-256/P-384, Ed25519 and Ed448 (`dnssec::{verify_rrsig, sign_rrset, PurecryptoVerifier, SigningKey, ZoneKey}`). It needs `alloc`.
+- `tsig` adds the HMAC backend for TSIG (RFC 8945); the TSIG wire format and the `TsigKey`/`TsigMac` traits work without it. `tkey` adds TKEY key agreement (implies `alloc` and `tsig`). `cookie-siphash` adds RFC 9018 server cookies. `serde` adds Serialize/Deserialize.
 - Builder helpers: `MessageBuilder::query(buf, id, name, qtype, class)` and `MessageBuilder::response(buf, &query)`. `response` copies the ID, opcode, RD and the question. The builder also has `set_limit`, `push_rrset` and `copy_message`, which truncate by whole RRset and set TC. `checkpoint`/`rollback` and `new_tcp` are available for length-prefixed messages.
 - `dnsbox::tcp`: `write_frame`, `split_frame`, and `FrameReassembler` for reading streams.
 - Records implement `Display` in zone-file presentation format.
 
-**Example** (verified against the git HEAD):
+**Example:**
 ```rust
 use dnsbox::{Class, Message, MessageBuilder, NameBuf, Rcode, Rtype};
 use dnsbox::rdata::{Mx, RData};
@@ -516,7 +526,7 @@ fn main() -> Result<(), dnsbox::Error> {
 ```
 
 **Gotchas:**
-- Do not depend on `dnsbox = "0.0.1"` from crates.io. That release has only `Header`/`Flags`/`Opcode`/`Rcode`.
+- Use 0.0.3 or later. The 0.0.1 release on crates.io is only a scaffold with `Header`/`Flags`/`Opcode`/`Rcode`.
 - `Message::parse` is lazy. Errors show up as you iterate, which is why each iterator item is a `Result`. `Message::parse_validated` walks the whole message once up front.
 - `NameBuf` is an owned name, stored inline in 255 bytes. `Name<'a>` is the borrowed, pointer-following form. Use `name.as_name()` to borrow a `NameBuf`.
 - The Go module [`dns`](../go.md#dns) (`dnsmsg` + `dnssec`) is the Go counterpart. The two are independent codebases.
@@ -576,7 +586,7 @@ fn main() -> Result<(), spotlib::Error> {
 
 ## rsupd
 
-**Repo:** https://github.com/KarpelesLab/rsupd · **Crate:** `rsupd` (crates.io `0.3.5`) · **License:** MIT · **Status:** complete and in use. It is the Rust successor to Go `goupd`.
+**Repo:** https://github.com/KarpelesLab/rsupd · **Crate:** `rsupd` (crates.io `0.3.6`) · **License:** MIT · **Status:** complete and in use. It is the Rust successor to Go `goupd`.
 
 Signed release distribution plus in-place auto-updating for Rust binaries. A producer CLI signs a CBOR manifest with an Ed25519 Bottle identity (`bottlers`). The consumer library trusts only a **32-byte fingerprint compiled into the binary**. It verifies the manifest signature, downloads the artifact (zstd via `compcol`), checks its SHA-256 (via `purecrypto`), then atomically swaps the binary and restarts. The HTTP transport is `rsurl`. The crate is `forbid(unsafe_code)` and builds for `fullrust`.
 

@@ -7,12 +7,12 @@ Karpeles Lab maintains a family of Rust crates and tools written from scratch in
 | Page | Contents |
 |------|----------|
 | [crypto-networking.md](crypto-networking.md) | purecrypto (crypto, X.509, TLS/DTLS/QUIC, post-quantum), purecrypto-tpm, cacrt, psl2, dnsbox, puressh, httpsd, rsurl, pktkit-rs, spotlib-rs, rsupd |
-| [data-formats.md](data-formats.md) | compcol, minizlib (deprecated), minlz-rs, emjson, tomlproc, charcode, anydcode (`anyd`), xuid-rs |
+| [data-formats.md](data-formats.md) | compcol, minizlib (deprecated), minlz-rs, emjson, tomlproc, charcode, anydcode (`anyd`), xuid-rs, hdf5rs |
 | [i18n-math.md](i18n-math.md) | intlrs (`intl`), strtotime-rs, timezone-data-rs, puremp, z3rs, polyclip |
-| [systems-toolchain.md](systems-toolchain.md) | kintane, purestd, fullrust, rustlibc, latticefoundry, qld, rsasm, reticle, univdreams, rsemu, algoc, lode |
-| [apps-engines.md](apps-engines.md) | argus, kataan, goro-rs, mathesis, puregit, fstool, origami, x11anywhere, cterm, cadlab |
-| [ui-hardware.md](ui-hardware.md) | noroi, stipple, ldtray, rawusb, usbmagic |
-| [ai-tools-databases.md](ai-tools-databases.md) | atelier, carl (formerly manu), nixvm, graphitesql, pebbledb |
+| [systems-toolchain.md](systems-toolchain.md) | kintane, purestd, fullrust, rustlibc, latticefoundry, qld, rsasm, reticle, univdreams, rsemu, algoc, lode, dlsym, dldota |
+| [apps-engines.md](apps-engines.md) | argus, kataan, goro-rs, mathesis, puregit, fstool, origami, x11anywhere, cterm, cadlab, guide, ems, csx, nanami |
+| [ui-hardware.md](ui-hardware.md) | noroi, stipple, ldtray, rawusb, usbmagic, visgrok, scopecap |
+| [ai-tools-databases.md](ai-tools-databases.md) | atelier, carl (formerly manu), mcptk, oxinfer, nixvm, graphitesql, pebbledb |
 | [blockchain.md](blockchain.md) | tsslib-rs, outscript-rs, ethrpc-rs, erigon-seg, libwallet, chiefsplitter, zanolib, evmabiless |
 | [oxideav.md](oxideav.md) | OxideAV media framework (codecs, containers, filters, `oxideav` CLI) |
 
@@ -36,5 +36,10 @@ Non-Rust packages: [../go.md](../go.md) (Go modules, portablesql) and [../fronte
 - **strtotime-rs** and **intlrs** use **timezone-data-rs** for IANA zones.
 - **zanolib** and **libwallet** build on **tsslib-rs** for threshold signatures, and **outscript-rs** covers addresses and transaction signing across chains.
 - **purestd** replaces `std` without libc; **fullrust** builds unmodified crates into libc-free static binaries; **rustlibc** goes the other way and provides a libc for C programs.
-- **lode** compiles through **latticefoundry**; **cadlab** uses **polyclip** for board geometry and OxideAV's 3D crates for models.
+- **lode** compiles through **latticefoundry**; **cadlab** and **guide** use **polyclip** for board geometry, and cadlab uses OxideAV's 3D crates for models.
+- **ems** (FDTD solver) builds on **csx** (geometry/materials) and **hdf5rs** (field dumps).
+- **dlsym** loads shared libraries safely (used by oxinfer, puressh, OxideAV); on libc-free **fullrust** binaries it uses **dldota** to boot the system's ld.so.
+- **rawusb** underpins the instrument tools **usbmagic**, **visgrok** and **scopecap**.
+- **oxinfer** (local LLM/diffusion inference) uses OxideAV for media I/O.
+- **purecrypto 0.10** is the current line; tsslib, outscript and libwallet require it graph-wide (zanolib 0.3.0 and ethrpc-rs `abi` still pull older copies).
 - Several crates have Go counterparts (outscript, ethrpc, xuid, spotlib, pktkit, strtotime, dns/dnsbox, minlz/S2); check each section for the exact compatibility claim. See [../go.md](../go.md).

@@ -8,7 +8,7 @@ ties them together (a TSS wallet backend exposed over C FFI/WASM). The rest are 
 ABI from EVM bytecode, decodes calldata), `erigon-seg` (Erigon 3 snapshot files) and `chiefsplitter` (an on-chain
 Solana program). `outscript` and `ethrpc-rs` are ports of Go libraries in KarpelesLab
 ([outscript](https://github.com/KarpelesLab/outscript), [ethrpc](https://github.com/KarpelesLab/ethrpc)). `tsslib`
-started as a port of Go [tss-lib](https://github.com/KarpelesLab/tss-lib) but no longer documents compatibility with it.
+started as a port of Go [tss-lib](https://github.com/KarpelesLab/tss-lib) (now archived) but no longer documents compatibility with it.
 
 ## Quick pick
 | Need | Use |
@@ -33,13 +33,13 @@ started as a port of Go [tss-lib](https://github.com/KarpelesLab/tss-lib) but no
 
 ## tsslib-rs
 
-**Repo:** https://github.com/KarpelesLab/tsslib-rs · **Crate:** `tsslib` (crates.io `0.2.13`) · **License:** MIT · **Status:** usable. FROST and DKLs23 are the main paths. `mldsatss`, `ecdsatss` and `eddsatss` are experimental and unaudited.
+**Repo:** https://github.com/KarpelesLab/tsslib-rs · **Crate:** `tsslib` (crates.io `0.2.17`; **use 0.2.17 or later**, see the security gotchas) · **License:** MIT · **Status:** usable. FROST and DKLs23 are the main paths. `mldsatss`, `ecdsatss` and `eddsatss` are experimental and unaudited.
 
 A pure-Rust threshold signature library. It started as a port of the Go [`tss-lib`](https://github.com/KarpelesLab/tss-lib),
 but upstream dropped all references to Go tss-lib in October 2026 (commit b835506), so do not assume compatibility with
 Go nodes. The JSON message and key-share formats are stable across releases. The crate is `#![no_std]` + `alloc`
 (the default `std` feature adds OS randomness, blocking `wait()` and OS locks), has `#![forbid(unsafe_code)]`, and does
-no field arithmetic of its own, since all group and lattice math comes from `purecrypto`. Edition 2024, MSRV 1.89.
+no field arithmetic of its own, since all group and lattice math comes from `purecrypto`. Edition 2024, MSRV 1.95.
 
 | Module / feature | Scheme | Output |
 |---|---|---|
@@ -51,6 +51,14 @@ no field arithmetic of its own, since all group and lattice math comes from `pur
 | `ecdsatss` | Legacy GG18/GG20 (Paillier + MtA) | ECDSA; loads legacy GG18/GG20 save files for migration |
 | `eddsatss` | Legacy GG18-style threshold EdDSA | Ed25519; for migrating legacy GG18-style keys |
 
+> **Security: upgrade to 0.2.17 or later.** Before 0.2.17, `dklstss` signing (`sign`, `sign_checked`, `SigningParty`,
+> `CheckedSigningParty`, `presign`) leaked the weighted key share λᵢ·xᵢ through the OT-extension KOS consistency check:
+> a co-signer, or anyone who could read the point-to-point messages, could recover it from about four signing sessions
+> with the same signer set (fewer with `CheckedSigningParty`, one when t ≥ 4). Fixed in commit df91eae (2026-10-31). The
+> fix bumps the signing wire version (`dkls:sign2:*` / `dkls:csign2:*`), so peers on 0.2.16 or earlier and peers on
+> 0.2.17 or later cannot sign together: upgrade every party, and treat keys that signed with older versions over a
+> channel an attacker could read, or with an untrusted co-signer, as exposed (reshare or rotate them).
+
 **Use it when:** you need t-of-n keygen, signing, resharing or refresh where no single host holds the key; you need
 HD derivation of threshold keys; you need threshold Taproot signing; or you must migrate existing GG18/GG20 key shares.
 **Don't use it when / limits:** you need peer authentication, which you must supply through your `MessageBroker`
@@ -61,11 +69,11 @@ transport. Don't use `mldsatss` in production (the README calls it an academic-g
 ```toml
 [dependencies]
 tsslib = "0.2"   # or pick protocols: { version = "0.2", default-features = false, features = ["std", "json", "dklstss"] }
-purecrypto = { version = "0.9", default-features = false, features = ["std", "rng"] }  # for OsRng
+purecrypto = { version = "0.10", default-features = false, features = ["std", "rng"] }  # for OsRng
 ```
 
 **Key features / cargo features:**
-- Each protocol has a like-named feature, and all are on by default, as are `std` and `json`. Without `std`, register
+- Each protocol has a like-named feature, and all are on by default, as are `std`, `json` and `error-messages` (descriptive serde error text; turn it off to save code size). Without `std`, register
   entropy with `rng::set_entropy_source`.
 - `tss` core: `PartyId`, `Parameters` / `ReSharingParameters`, the `MessageBroker` / `MessageReceiver` traits,
   `JsonMessage`, and `TssError`, which identifies the culprit through `culprits()`.
@@ -101,25 +109,32 @@ let saved = keys[0].to_json()?;                        // stable JSON save forma
 
 **Gotchas:**
 - Threshold convention: `t` is the polynomial degree, so signing needs `t + 1` parties, and `keygen` requires `1 ≤ t < n`.
-- DKLs keygen has a documented weakness when `n ≤ 2t`: colluding last-moving dealers can bias the key. Either run
-  keygen only among non-colluding parties or use `n > 2t`. Fixing it changes the wire format, so it needs a versioned
-  protocol change, which has not happened yet.
-- The default `dklstss` signing path has a selective-failure leak of about one bit per aborted session. Its wire format
-  is kept fixed because existing peers depend on it. Cap retries, and reshare after repeated unexplained aborts. Alternatively,
-  use `sign_checked` / `CheckedSigningParty`, which costs about 2x and catches inconsistent deviations
-  but, per the source, does not fully close the one-bit leak.
-- The README's install snippet says `version = "0.3"`, but crates.io is at 0.2.13. Use `0.2`.
-- `purecrypto` must resolve to 0.9 across your whole dependency graph, because its types cross crate boundaries.
+- **KOS leak before 0.2.17:** see the security note above. 0.2.17 also documents that a KOS check failure blamed on a
+  peer may leak one bit of this party's OT-sender secret per probe; stop signing with that peer on the existing pairwise
+  OT state and rebuild it with `PairSetupParty` first.
+- **`n ≤ 2t` keygen, fixed in 0.2.15** (commit 3c1c532): before it, colluding dealers that move last could end up knowing
+  the whole key when `n ≤ 2t` (2-of-2, 3-of-3, ...). Each dealer now proves knowledge of its constant term. This changed
+  the keygen round-1 messages, so all parties must run 0.2.15 or later. Rushing dealers can still bias the key's
+  distribution, but not choose it.
+- **Selective-failure aborts (still open):** the default `dklstss` signing path leaks about one bit of a secret share or
+  nonce per aborted session to a malicious co-signer. `sign_checked` / `CheckedSigningParty` costs about 2x and catches
+  inconsistent deviations, but per the source it does not fully close the leak; the real DKLs23 check needs a versioned
+  protocol change. With untrusted co-signers, cap retries and reshare after repeated unexplained aborts.
+- **`dklstss` and `ecdsatss` send VSS shares in the clear.** Their point-to-point messages must travel over a confidential
+  channel (TLS, Noise, ...), or anyone reading the transport can rebuild the key. The FROST, `eddsatss` and `mldsatss`
+  keygens and reshares seal shares end to end.
+- The README's install snippets say `version = "0.3"`, but crates.io is at 0.2.17. Use `0.2`.
+- `purecrypto` must resolve to 0.10 across your whole dependency graph, because its types cross crate boundaries.
 
 ## outscript-rs
 
-**Repo:** https://github.com/KarpelesLab/outscript-rs · **Crate:** `outscript` (crates.io `0.2.6`) · **License:** MIT · **Status:** usable. It is actively developed and verified against BIP-174 test vectors.
+**Repo:** https://github.com/KarpelesLab/outscript-rs · **Crate:** `outscript` (crates.io `0.2.7`) · **License:** MIT · **Status:** usable. It is actively developed and verified against BIP-174 test vectors.
 
 A Rust port of Go [`outscript`](https://github.com/KarpelesLab/outscript). It generates output scripts and
 addresses, parses addresses, and builds and signs transactions for Bitcoin-family chains (BTC, BCH, LTC, DOGE,
 Namecoin, Monacoin, Dash, Electraproto), EVM, Solana, Cardano, Massa, Tron and Zcash (transparent only). It is
 `#![no_std]`, and a heap-free core covers keys, signing, addresses, PSBT, raw BTC/EVM/Zcash transactions, and
-UR/BBQr parts. All crypto comes from `purecrypto`. Edition 2024, MSRV 1.89.
+UR/BBQr parts. All crypto comes from `purecrypto`. Edition 2024, MSRV 1.95.
 
 **Use it when:** you need wallet-side address derivation, validation, or offline transaction signing for several
 chains in one dependency; PSBT workflows (create, update, sign, combine, finalize, extract) including Taproot key
@@ -172,6 +187,7 @@ let signed = tx.bytes();
   chains are simply "unknown".
 - Taproot and unified-sighash inputs need `.amount(..)` and `.prev_script(..)` on `BtcTxSign`.
 - Some `no_std` snippets in the README still say `version = "0.1"`. The current version is 0.2.
+- 0.2.7 requires `purecrypto` ^0.10. Keep `purecrypto` at 0.10 across the whole graph (tsslib 0.2.16+ needs it too), or you get two copies whose types don't mix.
 
 ## ethrpc-rs
 
@@ -228,6 +244,8 @@ async fn main() -> Result<(), ethrpc_rs::Error> {
 - The crates.io crate named `ethrpc` (without `-rs`) is an unrelated third-party crate. Use `ethrpc-rs`.
 - Cancel a call by dropping the future (for example with `tokio::time::timeout`). There is no context object like
   in Go.
+- 0.3.2's optional `abi` feature depends on `purecrypto` 0.6 (for Keccak), so next to current `outscript`/`tsslib` you
+  get a second, older `purecrypto` in the dependency tree and more code size.
 
 ## erigon-seg
 
@@ -318,7 +336,7 @@ make dart-native  # stage the native lib for the local Dart client
   GitHub Releases for Android, iOS, macOS and Linux.
 
 **Gotchas:** Panics never cross the FFI boundary, because every export is wrapped in `catch_unwind`. The crate
-requires `purecrypto` 0.9 across the whole graph. Open TODOs include reshare improvements, Token-2022 transfer
+requires `purecrypto` 0.10 across the whole graph (the Rust workspace pins `0.10.1` and MSRV 1.95). Open TODOs include reshare improvements, Token-2022 transfer
 fees, and Bitcoin transaction history.
 
 ## chiefsplitter
@@ -412,6 +430,9 @@ std::fs::write("zano_tx_signed", wallet.encrypt(&finalized)?)?;
 - `sweep_to` requires at least 10 confirmations per deposit and accepts at most 80 deposits per transaction.
 - A threshold wallet's view key is derived from the shares, not from `keccak(spend)`. Seed-phrase recovery is
   therefore not possible for MPC wallets.
+- zanolib 0.3.0 still depends on `purecrypto` 0.9, while current `tsslib` (0.2.16+) and `outscript` use 0.10. With
+  the `mpc` feature, or next to those crates, the build pulls in two `purecrypto` versions; if types from them have
+  to meet, compilation fails.
 
 ## evmabiless
 

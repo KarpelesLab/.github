@@ -108,14 +108,14 @@ if let Some(m) = z.meta() {
 ```
 
 **Gotchas:**
-- 0.2 is a breaking change from 0.1: `Zone` and `ZoneType` lost their lifetime parameter, and `types()`, `transitions()` and `leap_seconds()` now return slices. `strtotime` 0.1.2 and `intl` 0.6.4 both use 0.2, so they share one copy and one `Zone` type. Older `intl` releases (0.6.3 and earlier) still pulled in 0.1.
+- 0.2 is a breaking change from 0.1: `Zone` and `ZoneType` lost their lifetime parameter, and `types()`, `transitions()` and `leap_seconds()` now return slices. `strtotime` 0.1.2 and `intl` 0.6.4+ both use 0.2, so they share one copy and one `Zone` type. Older `intl` releases (0.6.3 and earlier) still pulled in 0.1.
 - `Zone` is `Copy`, so it is cheap to pass by value.
 
 ## intlrs
 
-**Repo:** https://github.com/KarpelesLab/intlrs · **Crate:** `intl` (crates.io `0.6.4`) · **License:** MIT · **Status:** usable (official Unicode conformance suites pass 100% for normalization, collation, grapheme/word/sentence; about 99.98% for line breaking and 99.996% for bidi)
+**Repo:** https://github.com/KarpelesLab/intlrs · **Crate:** `intl` (crates.io `0.6.5`) · **License:** MIT · **Status:** usable (official Unicode conformance suites pass 100% for normalization, collation, grapheme/word/sentence; about 99.98% for line breaking and 99.996% for bidi)
 
-A pure-Rust, always-`#![no_std]` analog of ICU, targeting Unicode 17.0.0 and CLDR. UCD property tables are compiled into `const fn` `match` lookups, and CLDR data is embedded with `include_bytes!`, so nothing is initialized at runtime. The formatters need `alloc`, but the property lookups and plural rules work without an allocator. MSRV is 1.88 and edition 2024. The only optional dependency is `timezone-data` 0.1.
+A pure-Rust, always-`#![no_std]` analog of ICU, targeting Unicode 17.0.0 and CLDR. UCD property tables are compiled into `const fn` `match` lookups, and CLDR data is embedded with `include_bytes!`, so nothing is initialized at runtime. The formatters need `alloc`, but the property lookups and plural rules work without an allocator. MSRV is 1.88 and edition 2024. The only optional dependency is `timezone-data` 0.2.
 
 **Use it when:** you need Unicode text algorithms (NFC/NFD/NFKC/NFKD, UTS #10 collation with locale tailoring and numeric ordering, UAX #29/#14 segmentation, UAX #9 bidi, case mapping and folding, UAX #31 identifiers, UTS #39 confusables, UTS #46 IDNA/Punycode, scripts, East Asian width, character names). It also covers ECMA-402-style formatting: numbers, currency, compact, percent, units, durations, dates and skeletons, lists, relative time, display names, plural rules, a MessageFormat subset, BCP-47 parsing with likely subtags and negotiation, RBNF spell-out, transliteration, non-Gregorian calendars, and localized time-zone names.
 **Don't use it when / limits:** you need full ICU parity. IDNA does not yet enforce the contextual CheckBidi/CheckJoiners rules, MessageFormat is only a subset, and the Chinese lunisolar calendar covers 1900-2099. The default build is several MB of tables, so trim features for WASM or embedded targets.
@@ -162,28 +162,29 @@ let ny = intl::timezone::load_zone("America/New_York").unwrap();
 let offset = ny.offset_at(1_700_000_000); // seconds east of UTC
 ```
 
-**Other entry points (verified names):** `unicode::collate::Collator::new(..).with_numeric(true)`, `Tailoring::for_locale("sv")`, `unicode::idna::to_ascii`, `unicode::spoof::skeleton`, `unicode::words`/`sentences`/`line_breaks`, `unicode::bidi::process`, `locale::Locale::parse(..).maximize()`, `locale::negotiate`, `number::format_compact`, `list::format_list(locale, &[..], &ListFormatOptions)`, `relative::format_relative(locale, f64, RelativeUnit::Day, &opts)`, `datetime::format_date(locale, &DateTime, DateStyle::Long)`, `datetime::DateTime::parse_iso8601`, `unit::format_unit`, `unit::format_duration`, `display::language_name`, and `display::region_name`.
+**Other entry points (verified names):** `unicode::collate::Collator::new(..).with_numeric(true)`, `Tailoring::for_locale("sv")`, `unicode::idna::to_ascii`, `unicode::spoof::skeleton`, `unicode::words`/`sentences`/`line_breaks`, `unicode::bidi::process`, `locale::Locale::parse(..).maximize()`, `locale::negotiate`, `number::format_compact`, `list::format_list(locale, &[..], &ListFormatOptions)`, `relative::format_relative(locale, f64, RelativeUnit::Day, &opts)`, `datetime::format_date(locale, &DateTime, DateStyle::Long)`, `datetime::DateTime::parse_iso8601`, `unit::format_unit`, `unit::format_duration`, `display::language_name`, `display::region_name`, and (new in 0.6.5) `unicode::raw_decomposition(c, form)` (single-step decomposition), `spellout::spell_rule_set(lang, rule_set, value)` (named RBNF rule sets; spell-out now covers ru, uk, pl and ja), and `number::CurrencyUsage::Cash` (CLDR cash digits and rounding increments) plus plural currency names.
 
 **Gotchas:**
 - Most formatter functions take a BCP-47 locale string as their first argument and return `String`. Unknown locales fall back through CLDR inheritance to root.
+- Since 0.6.5, inheritance follows CLDR `parentLocales` before truncation (`en-GB` → `en-001` → `en`, `pt-AO` → `pt-PT`, `es-MX` → `es-419`), and a non-default script falls back to root (`zh-Hant` never inherits Simplified strings). Output for locales such as en-GB, en-AU, pt-PT, zh-TW and zh-HK therefore differs from 0.6.4; update snapshot tests when upgrading.
 - Missing non-Gregorian calendar features produce a compile error (`format_<cal>_date` does not exist) or `None`, never a wrong Gregorian string.
 - Number formatting uses the locale's default numbering system, as ECMA-402 does. For example, `ar-EG` yields Arabic-Indic digits.
 
 ## puremp
 
-**Repo:** https://github.com/KarpelesLab/puremp · **Crate:** `puremp` (crates.io `0.2.5`) · **License:** MIT · **Status:** usable (broad, actively developed; some advanced algorithms are marked correctness-first rather than tuned for speed)
+**Repo:** https://github.com/KarpelesLab/puremp · **Crate:** `puremp` (crates.io `0.3.3`) · **License:** MIT · **Status:** usable (broad, actively developed; some advanced algorithms are marked correctness-first rather than tuned for speed)
 
-A clean-room, pure-Rust GMP+MPFR-class arbitrary-precision library covering `Nat`, `Int`, `Rational`, `InfRational`, correctly rounded binary `Float` and `FixedFloat`, `Decimal`, `Dyadic`, `Padic`, `Complex<T>`, `ModInt`, `Poly<T>`, `Matrix<T>`, `Interval`, `Ball`, `GaloisField`, `EllipticCurve`, `Algebraic`/`Quadratic` and `NumberField`. It is `no_std` + `alloc` (CI-verified on `thumbv7em-none-eabi`), its core has zero dependencies, and `unsafe` is denied everywhere except the opt-in C ABI. It also ships a CLI calculator and a C library (`include/puremp.h`). MSRV is 1.88 and edition 2024.
+A clean-room, pure-Rust GMP+MPFR-class arbitrary-precision library covering `Nat`, `Int`, `Rational`, `InfRational`, correctly rounded binary `Float` and `FixedFloat`, `Decimal`, `Dyadic`, `Padic`, `Complex<T>`, `ModInt`, `Poly<T>`, `Matrix<T>`, `Interval`, `Ball`, `GaloisField`, `EllipticCurve`, `Algebraic`/`Quadratic` and `NumberField`. It is `no_std` + `alloc` (CI-verified on `thumbv7em-none-eabi`), its core has zero dependencies, and `unsafe` is denied everywhere except the opt-in C ABI. It also ships a CLI calculator and a C library (`include/puremp.h`). MSRV is 1.95 and edition 2024. Recent additions include GMP-parity operations, a `MersenneTwister` that reproduces GMP's random streams, `RadixConverter` for repeated base conversion, and faster NTT multiplication.
 
 **Use it when:** you need big-integer or exact-rational arithmetic, multi-precision floats with directed rounding (`Float::pi`, `sqrt`, special functions), or number theory (factorization via Pollard rho, ECM and a quadratic sieve; BPSW; primality certificates including ECPP; CRT; `sqrt_mod`; discrete log). It also handles exact polynomial and matrix algebra over ℤ, ℚ, ℤ/nℤ and GF(pᵏ), LLL, PSLQ/`identify`, and elliptic-curve point counting (Schoof).
-**Don't use it when / limits:** you need constant-time or side-channel-resistant arithmetic for cryptography; use the sibling `purecrypto` instead. It is not a drop-in replacement for GMP's C API. GNFS is correct only to about 19 digits and is not tuned.
+**Don't use it when / limits:** you need constant-time or side-channel-resistant arithmetic for cryptography in general; use the sibling `purecrypto` instead (the one exception is `modpow_sec`, below). It is not a drop-in replacement for GMP's C API. GNFS is correct only to about 19 digits and is not tuned.
 
 **Add it:**
 ```toml
 [dependencies]
-puremp = "0.2"
+puremp = "0.3"
 # lean: integers + rationals only, no_std + alloc
-# puremp = { version = "0.2", default-features = false, features = ["rational"] }
+# puremp = { version = "0.3", default-features = false, features = ["rational"] }
 ```
 The CLI is `cargo install puremp`, which installs the `puremp` REPL. It supports `+ - * / % **`, parentheses and `name = expr`.
 
@@ -213,11 +214,12 @@ assert_eq!(pi.to_decimal_string(20), "3.14159265358979323846");
 **Gotchas:**
 - `Rational::new` returns `Rational` and **panics** on a zero denominator. Use `Rational::checked_new` to get an `Option` instead.
 - Arithmetic is mostly method-based (`add`, `pow`, `modpow`) and takes references. `Float` operations take an explicit precision in bits and a `RoundingMode`.
-- The `Int` API is not constant-time.
+- The `Int` API is not constant-time, except `Nat::modpow_sec` / `Int::modpow_sec`, whose operations and memory accesses depend only on the operands' limb counts (for secret exponents).
+- 0.3 is a breaking change from 0.2: `Int::pow`, `mul_2k`, `div_2k_trunc`, `mod_2k` and `bit` (and `Nat::pow` since 0.3.3) now take `u64` exponents and bit counts. Integer literals still work; variables of another integer type need converting.
 
 ## z3rs
 
-**Repo:** https://github.com/KarpelesLab/z3rs · **Crate:** `z3rs` (crates.io `0.0.9`) · **License:** MIT (derivative of Microsoft's MIT-licensed Z3) · **Status:** experimental to usable (all Z3 theories present and sound, 0 known wrong verdicts across about 90k differential-fuzzed scripts, completeness and performance still behind upstream)
+**Repo:** https://github.com/KarpelesLab/z3rs · **Crate:** `z3rs` (crates.io `0.0.10`) · **License:** MIT (derivative of Microsoft's MIT-licensed Z3) · **Status:** experimental to usable (all Z3 theories present and sound, 0 known wrong verdicts across about 90k differential-fuzzed scripts, completeness and performance still behind upstream)
 
 A pure-Rust, `no_std` + `alloc` port of the Z3 theorem prover, pinned to Z3 v4.17.0 and ported file by file. There is no GMP, no C and no `-sys` crate, and the only dependency is `puremp`. It includes a full SMT-LIB 2 front end, a CDCL SAT core (DIMACS, DRAT checking), DPLL(T) with Nelson-Oppen, and theories for UF, LIA/LRA, NRA (CAD), NIA, bit-vectors, arrays, datatypes, floating point, strings/sequences/regex, quantifiers (E-matching), CHC/Horn, Datalog and optimization. It also has a Z3-compatible CLI and a C ABI subset of `z3_api.h`.
 
@@ -227,8 +229,8 @@ A pure-Rust, `no_std` + `alloc` port of the Z3 theorem prover, pinned to Z3 v4.1
 **Add it:**
 ```toml
 [dependencies]
-z3rs = "0.0.9"
-# z3rs = { version = "0.0.9", features = ["std"] }   # timers/threads/std::error::Error
+z3rs = "0.0.10"
+# z3rs = { version = "0.0.10", features = ["std"] }   # timers/threads/std::error::Error
 ```
 The CLI is `cargo install z3rs`, then `z3rs problem.smt2` or `z3rs problem.cnf`. Flags include `-dimacs`, `-dl` (Datalog), `-drat <cnf> <proof>` and `-memory:<MB>`, and the environment variable `Z3RS_MEMORY_LIMIT_MB` also sets a memory limit.
 
@@ -260,10 +262,11 @@ assert_eq!(ctx.check(), SatResult::Unsat);
 - `Solver` methods return `Result<_, String>` for parse and type errors. `SatResult::Unknown` means a budget ran out or the fragment is undecided, and it is never a guess.
 - The crate name is `z3rs`, not `z3`. The `z3` crate on crates.io is a different project that binds native Z3.
 - Version 0.0.x means the API may change between releases.
+- The 0.0.10 release depends on and re-exports `puremp ^0.2`, while puremp itself is at 0.3. Use the re-exported `z3rs::puremp` for values you pass to z3rs, or you will have two incompatible `Int` types. Master has moved to puremp 0.3 but that is not released yet.
 
 ## polyclip
 
-**Repo:** https://github.com/KarpelesLab/polyclip · **Crate:** `polyclip` (crates.io `0.0.4`) · **License:** MIT · **Status:** usable, pre-1.0. It is covered by property tests, weekly `cargo-fuzz` runs of every public operation, and differential tests against Clipper2 (the `oracle/` crate). It was built for and is used by [`cadlab`](apps-engines.md#cadlab).
+**Repo:** https://github.com/KarpelesLab/polyclip · **Crate:** `polyclip` (crates.io `0.0.6`) · **License:** MIT · **Status:** usable, pre-1.0. It is covered by property tests, weekly `cargo-fuzz` runs of every public operation, and differential tests against Clipper2 (the `oracle/` crate). It was built for and is used by [`cadlab`](apps-engines.md#cadlab).
 
 2D polygon geometry on integer `i64` coordinates with exact predicates (`i128`/wide arithmetic). It does booleans, offsetting, arc approximation, distance queries, fracturing, triangulation and simplification. Output is **guaranteed valid after snap rounding**: simple rings, no crossings, correct nesting, vertices moved by at most √2/2. It is also **canonical and bit-identical across platforms**: outer rings are CCW and holes CW, each ring starts at its smallest vertex, and polygons are sorted. The crate does not panic, uses no `unsafe` and has no global state. Its only required dependency is `libm`, which keeps arc results deterministic.
 
@@ -280,8 +283,8 @@ assert_eq!(ctx.check(), SatResult::Unsat);
 **Add it:**
 ```toml
 [dependencies]
-polyclip = "0.0.4"
-# polyclip = { version = "0.0.4", features = ["serde", "rayon"] }
+polyclip = "0.0.6"
+# polyclip = { version = "0.0.6", features = ["serde", "rayon"] }
 ```
 
 **Key features / cargo features:**
@@ -291,6 +294,7 @@ polyclip = "0.0.4"
 - **Incremental:** `ZoneFill` inserts, updates or removes obstacles by `u64` id, and refills in well under a millisecond with the same result as a full recompute.
 - **Provenance tags:** a `u64` per edge survives booleans and offsets (the `*_tagged` functions, `arcs_from_tags`).
 - **Queries:** `area2`, `centroid`, `locate`, `intersects`, `contains`, `distance` (with the closest points), `distance_sq`, and a fast `distance_less_than` for DRC.
+- **Prepared geometries:** `Prepared::new(&geom)` builds a spatial index once for a geometry queried many times (a zone fill checked against every pad and track). Its `intersects`, `contains`, `distance` and `distance_less_than` return exactly what the free functions return, closest points included, with less work.
 - **Utilities:** `validate`, `fracture`/`fracture_set` (holes joined by zero-width cut-ins, for Gerber regions), `simplify_*`, `convex_hull`, `minkowski_sum`, `triangulate`, `triangulate_delaunay`, `trapezoids`.
 - `serde` derives `Serialize`/`Deserialize` for all types. `rayon` parallelizes boolean phases, and the output is identical for any thread count.
 
@@ -324,4 +328,4 @@ fn main() -> polyclip::Result<()> {
 **Gotchas:**
 - `area2`/`ring_area2` return **twice** the signed area as `i128`.
 - Inputs can be any `RingSource` (`Ring`, `Polygon`, `PolygonSet`, slices of rings), so an `offset` result can be passed straight back in as a clip operand.
-- cadlab currently pins `polyclip 0.0.2`. Under Cargo's 0.0.x rules each patch release is semver-incompatible, so the two versions do not unify in a dependency tree.
+- crates.io cadlab 0.0.2 requires `polyclip ^0.0.4` (master uses 0.0.6). Under Cargo's 0.0.x rules each patch release is semver-incompatible, so different versions do not unify in a dependency tree.

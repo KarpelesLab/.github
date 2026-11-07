@@ -22,7 +22,7 @@ Conventions for this file: module path is `github.com/KarpelesLab/<repo>` unless
 | Sign Windows .exe/.dll in pure Go | [`authenticode`](#authenticode), [`gosigner`](#gosigner) |
 | HSM (YubiHSM2, IDPrime smart cards) or TPM keys | [`hsm`](#hsm), [`tpmlib`](#tpmlib) |
 | Hash algorithm chosen by name (PHP `hash()` compatible) | [`anyhash`](#anyhash) |
-| Threshold ECDSA/EdDSA signatures | [`tss-lib`](#tss-lib) |
+| Threshold ECDSA/EdDSA signatures | [`tss-lib`](#tss-lib) (archived; new code should use Rust [`tsslib-rs`](rust/blockchain.md#tsslib-rs)) |
 | Crypto addresses / tx signing for many chains | [`outscript`](#outscript) |
 | Ethereum JSON-RPC | [`ethrpc`](#ethrpc) |
 | Read/write SquashFS images | [`squashfs`](#squashfs) |
@@ -149,9 +149,9 @@ Install the CLI with `go install github.com/KarpelesLab/goro/sapi/php-cli@latest
 **Gotcha:** code that uses `core/compiler` directly must blank-import `core/vm/vmcompiler`.
 
 ### gsh
-**Repo:** https://github.com/KarpelesLab/gsh · **Module:** `github.com/KarpelesLab/gsh` · **License:** no license file · **Status:** early/minimal
+**Repo:** https://github.com/KarpelesLab/gsh · **Module:** `github.com/KarpelesLab/gsh` · **License:** no license file · **Status:** **archived** (read-only, last code change 2021); early/minimal
 
-A POSIX-ish shell in Go, meant for running shell scripts inside Go programs without depending on bash or dash.
+A POSIX-ish shell in Go, meant for running shell scripts inside Go programs without depending on bash or dash. Archived: do not start new code on it.
 
 ### nodejs
 **Repo:** https://github.com/KarpelesLab/nodejs · **Module:** `github.com/KarpelesLab/nodejs` · **License:** MIT
@@ -378,9 +378,9 @@ Encrypts and decrypts VNC `~/.vnc/passwd` files, which use a DES-based obfuscati
 ## Blockchain & wallets
 
 ### tss-lib
-**Repo:** https://github.com/KarpelesLab/tss-lib · **Module:** `github.com/KarpelesLab/tss-lib/v2` (note the `/v2`) · **License:** MIT
+**Repo:** https://github.com/KarpelesLab/tss-lib · **Module:** `github.com/KarpelesLab/tss-lib/v2` (note the `/v2`) · **License:** MIT · **Status:** **archived** (read-only since 2026-10; last code change 2026-06)
 
-A fork of Binance's tss-lib: {t,n}-threshold ECDSA (GG18) and EdDSA, covering key generation, signing and resharing. Adds an experimental `mldsatss` package for threshold ML-DSA-44. It is wire-compatible with `tsslib-rs`. Read the security notes in the README before using it.
+A fork of Binance's tss-lib: {t,n}-threshold ECDSA (GG18) and EdDSA, covering key generation, signing and resharing. Adds an experimental `mldsatss` package for threshold ML-DSA-44. Read the security notes in the README before using it. The maintained successor is the Rust [`tsslib-rs`](rust/blockchain.md#tsslib-rs) (crate `tsslib`), which no longer claims compatibility with this Go library and has since changed its DKLs23 wire format (0.2.15 keygen, 0.2.17 signing), so do not plan on mixing the two in one signing group.
 
 ### outscript
 **Repo:** https://github.com/KarpelesLab/outscript · **Module:** `github.com/KarpelesLab/outscript` · **License:** MIT
@@ -579,10 +579,10 @@ out, err := img.Pack(map[string][]byte{"rootfs": newRootfs})
 **Gotchas:** the `pmb` header CRC and the USRCONF CRC algorithms are not reversed yet. `pmb.HCRCReproduced()` always returns false, and edits keep the old values. It is also unknown whether the head unit's updater validates a KWI before flashing, so test only on a donor unit.
 
 - **streamdeck** (MIT): Elgato/Corsair Stream Deck control without the vendor software. No cgo, Linux only.
-- **hid** (MIT): a pure-Go HID driver with no dependencies. Linux 386/amd64 only.
+- **hid** (MIT, **archived**): a pure-Go HID driver with no dependencies. Linux 386/amd64 only. For new code in Rust, use [`rawusb`](rust/ui-hardware.md#rawusb) (its `hid` feature).
 - **pixoo64** (MIT): sends images and commands to a Divoom Pixoo64 over the LAN, by IP address.
 - **intel-dcapd** (https://github.com/KarpelesLab/intel-dcapd): a single-binary replacement, written in Go, for Intel's SGX DCAP PCCS caching service. Unofficial. Install with `make install` and an Intel API key.
-- `usbmagic` is Rust and `selecard` is Python; see their repos. `odeck` is an open-hardware USB-C dock (KiCad 10 project with Python design scripts, design stage: 10 Gbps + DisplayPort, 140 W pass-through charging, SD, 2.5 GbE, RP2350 status display); see https://github.com/KarpelesLab/odeck.
+- `usbmagic` is Rust and `selecard` is Python; see their repos. `odock` (renamed from `odeck`) is an open-hardware USB-C deck: a KiCad 10 project generated from Python scripts, 10 Gbps upstream with DisplayPort, 140 W pass-through charging, SD, 2.5 GbE and an RP2350 status display, with a USB4 version planned; board routing is in progress and nothing has been built yet (https://github.com/KarpelesLab/odock). `multivolt` is open hardware of the same kind: a USB-C PD breadboard power supply (two jumper-selected 1.2-5 V rails, latching overcurrent protection) and a 4-channel DIP level translator, KiCad 10 generated from Python, ready for JLCPCB but not yet fabricated (https://github.com/KarpelesLab/multivolt).
 
 ## Go utilities
 
