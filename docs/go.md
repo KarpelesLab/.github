@@ -37,7 +37,7 @@ Conventions for this file: module path is `github.com/KarpelesLab/<repo>` unless
 | Raw IANA tz transitions | [`gotz`](#gotz) |
 | Country / currency / language data | [`countrydb`, `currencydb`, `lngdb`](#reference-data) |
 | Prefixed, base32 UUIDs (`user-xxxx-...`) | [`xuid`](#xuid) |
-| Collapse duplicate concurrent calls (generic singleflight) | [`unison`](#unison) |
+| Collapse duplicate concurrent calls (generic singleflight) | [`unison`](#unison) (archived) |
 | Loose type conversion (`any` to struct/int/...) | [`typutil`](#typutil) |
 | Self-updating Go binaries | [`goupd`](#goupd) |
 | Sandbox `npm install` and similar | [`bnpm`](#bnpm) |
@@ -410,7 +410,7 @@ Base58 with no dependencies. Provides the Bitcoin and Flickr alphabets (`base58.
 
 Bech32 (BIP-173), Bech32m (BIP-350) and CashAddr, plus segwit helpers (`SegwitAddrDecode`).
 
-Rust-only blockchain repos listed in the profile: `libwallet`, `erigon-seg`, `chiefsplitter`.
+Rust-only blockchain repos listed in the profile: `libwallet`, `erigon-seg`; `chiefsplitter` now lives in [TibaneLabs](https://github.com/TibaneLabs/chiefsplitter).
 
 ## Filesystems & storage
 
@@ -592,7 +592,7 @@ out, err := img.Pack(map[string][]byte{"rootfs": newRootfs})
 UUID-sized IDs with a type prefix, encoded in base32 (for example `user-zha364-5mdr-dmzk-gsil-g73eiu7u`). UUIDv7 by default. Implements `sql.Scanner`, `driver.Valuer` and JSON. Create one with `xuid.New("user")` and parse it with `xuid.Parse(s)`. These are the ID format used by the KLB platform.
 
 ### unison
-**Repo:** https://github.com/KarpelesLab/unison · **Module:** `github.com/KarpelesLab/unison` · **License:** MIT
+**Repo:** https://github.com/KarpelesLab/unison · **Module:** `github.com/KarpelesLab/unison` · **License:** MIT · **Status:** **archived** (read-only since 2026-11)
 
 A generic singleflight: `unison.Group[K, V]` runs one call per key while concurrent callers share its result. Adds time-based caching and batching helpers.
 
@@ -608,7 +608,7 @@ Auto-updater for binaries built with KLB's make-go pipeline. Calling `goupd.Auto
 
 ### Small utilities
 - **uhash** (MIT, CLI): runs many hash algorithms in parallel over one read of stdin, a file or a URL. `go install github.com/KarpelesLab/uhash@latest`.
-- **bitmap** (no license file): bitmaps, with atomic operations.
+- **bitmap** (no license file, **archived**): bitmaps, with atomic operations.
 - **ringbuf** (MIT): a thread-safe ring buffer with multiple, optionally blocking, readers. Useful as a log buffer.
 - **weak** (MIT): a generic weak-reference `weak.Map` and `weak.Ref`. Since Go 1.24, prefer the stdlib `weak` package for new code.
 - **textutil** (MIT): word wrapping, forked from mitchellh/go-wordwrap.

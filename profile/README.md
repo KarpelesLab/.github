@@ -7,6 +7,7 @@ We develop and maintain a wide range of open-source tools and libraries, primari
 [![Website](https://img.shields.io/badge/Website-klb.jp-blue)](https://klb.jp)
 [![OxideAV](https://img.shields.io/badge/GitHub-OxideAV-orange)](https://github.com/OxideAV)
 [![portablesql](https://img.shields.io/badge/GitHub-portablesql-00ADD8)](https://github.com/portablesql)
+[![Tibane Labs](https://img.shields.io/badge/GitHub-TibaneLabs-8A2BE2)](https://github.com/TibaneLabs)
 
 **For AI agents:** start at [`llms.txt`](https://github.com/KarpelesLab/.github/blob/master/llms.txt) for a map of our packages, with [usage docs](https://github.com/KarpelesLab/.github/tree/master/docs) covering the [pure-Rust ecosystem](https://github.com/KarpelesLab/.github/blob/master/docs/rust/README.md), [Go modules](https://github.com/KarpelesLab/.github/blob/master/docs/go.md) and [frontend libraries](https://github.com/KarpelesLab/.github/blob/master/docs/frontend.md).
 
@@ -154,6 +155,9 @@ Secure implementations for authentication, HSM, and post-quantum cryptography.
 **Hardware security research**
 - **[ledger_nano_x_pads](https://github.com/KarpelesLab/ledger_nano_x_pads)** - Interactive map of the Ledger Nano X board: test pads, traced nets, KiCad reconstruction ([view](https://karpeleslab.github.io/ledger_nano_x_pads/))
 - **[ledger_nano_re](https://github.com/KarpelesLab/ledger_nano_re)** - Reverse engineering of the original Ledger Nano (ST23YT66): X-rays, die photos, bond-wire map, USB/HID notes
+- **[ledger_nano_s_re](https://github.com/KarpelesLab/ledger_nano_s_re)** - Ledger Nano S hardware RE: board photos, BOM, KiCad reconstruction, secure-element pinout notes
+- **[ledger_nano_splus_re](https://github.com/KarpelesLab/ledger_nano_splus_re)** - Ledger Nano S+ secure element identification (ST33K1M5) and ball map from photos and public certification documents
+- **[ledger_flex_re](https://github.com/KarpelesLab/ledger_flex_re)** - Ledger Flex main board: X-rays, stitched microscope views, work-in-progress KiCad reconstruction
 - **[ledger_implant_osint](https://github.com/KarpelesLab/ledger_implant_osint)** - Tracker of publicly reported hardware-wallet implant cases with archived sources ([site](https://karpeleslab.github.io/ledger_implant_osint/))
 - **[ledger_implant_detector](https://github.com/KarpelesLab/ledger_implant_detector)** - Concept handheld detector for antenna implants in hardware wallets (capacitive array + RF loop; not yet built)
 
@@ -161,14 +165,28 @@ Secure implementations for authentication, HSM, and post-quantum cryptography.
 Multi-chain wallet infrastructure, signing, and cryptographic primitives.
 
 - **[libwallet](https://github.com/KarpelesLab/libwallet)** - Multi-chain mobile wallet library with TSS — Ethereum, Bitcoin, Solana, NFTs
+- **[lsdk](https://github.com/KarpelesLab/lsdk)** - Rust SDK, CLI and WebHID console for BOLOS hardware wallets: genuine check, apps/firmware, sideloading, EVM/BTC/Solana signing ([console](https://karpeleslab.github.io/lsdk/))
+- **[btcwallet](https://github.com/KarpelesLab/btcwallet)** - Read-only inspector for legacy Berkeley DB bitcoin wallet.dat files (no libdb, never prints private keys)
 - **[tsslib-rs](https://github.com/KarpelesLab/tsslib-rs)** - `no_std` threshold signatures: FROST (incl. secp256k1/Taproot), DKLs23 ECDSA, threshold ML-DSA
 - **[outscript](https://github.com/KarpelesLab/outscript)** / **[outscript-rs](https://github.com/KarpelesLab/outscript-rs)** - Output scripts, addresses and transaction signing across many networks (Go / Rust)
 - **[ethrpc](https://github.com/KarpelesLab/ethrpc)** / **[ethrpc-rs](https://github.com/KarpelesLab/ethrpc-rs)** - Ethereum JSON-RPC client (Go / Rust)
 - **[erigon-seg](https://github.com/KarpelesLab/erigon-seg)** - Read, query, write and merge Erigon 3 seg state files
-- **[chiefsplitter](https://github.com/KarpelesLab/chiefsplitter)** - Solana program for configurable fee splitting
 - **[secp256k1](https://github.com/KarpelesLab/secp256k1)** / **[edwards25519](https://github.com/KarpelesLab/edwards25519)** - Elliptic curve primitives
 - **[base58](https://github.com/KarpelesLab/base58)** / **[bech32m](https://github.com/KarpelesLab/bech32m)** - Address encodings
 - **[blindsig](https://github.com/KarpelesLab/blindsig)** - Blind signatures
+
+### Tibane Labs
+Wallets, hardware-wallet firmware and Solana programs from our sister org [Tibane Labs](https://github.com/TibaneLabs).
+
+- **[TibaneApp](https://github.com/TibaneLabs/TibaneApp)** - Non-custodial multi-chain wallet for the Solana Seeker, built in Flutter on [libwallet](https://github.com/KarpelesLab/libwallet) (MPC keys, DEX swaps, dApp browser)
+- **[clawdwallet](https://github.com/TibaneLabs/clawdwallet)** - Agent-side runtime for the ClawdWallet 2-of-3 TSS custody wallet on Solana, over [Spot](https://github.com/KarpelesLab/spotlib)
+- **[catcard](https://github.com/TibaneLabs/catcard)** - Clean-room open-source Rust firmware for Coldcard hardware wallets (`no_std`, Cortex-M4F)
+  - [catcard-sdk](https://github.com/TibaneLabs/catcard-sdk) (air-gapped signing over BBQr / BC-UR QR codes for web and Node.js) and [catcard-mgr](https://github.com/TibaneLabs/catcard-mgr) (web manager for CatCard or stock Coldcard over USB)
+- **[coldcard-firmware-archive](https://github.com/TibaneLabs/coldcard-firmware-archive)** - Every officially signed Coldcard firmware, verified against Coinkite's SHA256 manifest
+- **[chiefsplitter](https://github.com/TibaneLabs/chiefsplitter)** - Solana program for configurable fee splitting
+- **[chiefstaker](https://github.com/TibaneLabs/chiefstaker)** - Solana program for staking SPL / Token-2022 tokens with time-weighted SOL rewards ([SDK](https://github.com/TibaneLabs/chiefstaker-sdk))
+- **[chiefliquidity](https://github.com/TibaneLabs/chiefliquidity)** - Solana AMM + lending protocol where liquidation executes atomically inside the swap, no keepers
+- **[das](https://github.com/TibaneLabs/das)** - Metaplex DAS with CockroachDB support and a Redis-free Yellowstone gRPC ingester
 
 ### File Systems & Storage
 Pure Go implementations for various file system and archive formats.
@@ -234,6 +252,7 @@ Libraries for interacting with hardware devices.
 - **[kwi](https://github.com/KarpelesLab/kwi)** - Unpack and repack LOADING.KWI firmware of Toyota/Lexus (Panasonic/Aisin AW) navigation head units
 - **[odock](https://github.com/KarpelesLab/odock)** - Open-hardware USB-C deck (KiCad): 10 Gbps + DisplayPort, 140 W pass-through charging, SD, 2.5 GbE, RP2350 status LCD; USB4 planned (routing in progress)
 - **[multivolt](https://github.com/KarpelesLab/multivolt)** - Open-hardware USB-C PD breadboard power supply (dual 1.2–5 V rails, OCP) and DIP level translator (KiCad, generated from Python)
+- **[lightning_debug](https://github.com/KarpelesLab/lightning_debug)** - iCE40 FPGA carrier board for a Lightning breakout: sniff/emulate every Lightning pin, USB passthrough, FT2232H debug UART (KiCad, not yet fabricated)
 - **[intel-dcapd](https://github.com/KarpelesLab/intel-dcapd)** - Intel DCAP daemon
 
 ### Frontend & Web
@@ -262,8 +281,6 @@ General-purpose Go libraries and tools.
 - **[goupd](https://github.com/KarpelesLab/goupd)** - Auto updater for Go applications
 - **[uhash](https://github.com/KarpelesLab/uhash)** - Multi-algorithm hashing tool
 - **[xuid](https://github.com/KarpelesLab/xuid)** / **[xuid-rs](https://github.com/KarpelesLab/xuid-rs)** - Type-prefixed, base32-encoded UUIDs (Go / Rust)
-- **[unison](https://github.com/KarpelesLab/unison)** - Coalescing duplicate function calls with generics and caching
-- **[bitmap](https://github.com/KarpelesLab/bitmap)** - Bitmap manipulation
 - **[ringbuf](https://github.com/KarpelesLab/ringbuf)** - Ring buffer with readers
 - **[weak](https://github.com/KarpelesLab/weak)** - Weak reference map (Go 1.18+)
 - **[textutil](https://github.com/KarpelesLab/textutil)** - Text processing (word wrapping, etc.)

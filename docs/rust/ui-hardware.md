@@ -1,6 +1,6 @@
 # UI & Hardware
 
-Crates for talking to people (terminals, windows, tray icons) and to USB devices, all written with few or no third-party crates. **`noroi`** is a curses-style terminal UI with zero crates.io dependencies. **`stipple`** is a self-drawn, cross-platform GUI toolkit that renders through the pure-Rust `oxideav` media stack. **`ldtray`** puts an icon in the system tray and loads every OS GUI library at runtime, so a headless daemon still links and runs. On the hardware side, **`rawusb`** is a libusb replacement with no dependencies, and several tools build on it: **`usbmagic`** drives USB test instruments (starting with the Great Scott Gadgets Cynthion), **`visgrok`** is a driver, protocol analyzer and TUI/web UI for Sipeed SLogic logic analyzers, and **`scopecap`** drives a ToupTek USB3 microscope camera for live mosaic stitching.
+Crates for talking to people (terminals, windows, tray icons) and to USB devices, all written with few or no third-party crates. **`noroi`** is a curses-style terminal UI with zero crates.io dependencies. **`stipple`** is a self-drawn, cross-platform GUI toolkit that renders through the pure-Rust `oxideav` media stack. **`ldtray`** puts an icon in the system tray and loads every OS GUI library at runtime, so a headless daemon still links and runs. On the hardware side, **`rawusb`** is a libusb replacement with no dependencies, and several tools build on it: **`usbmagic`** drives USB test instruments (starting with the Great Scott Gadgets Cynthion), **`visgrok`** is a driver, protocol analyzer and TUI/web UI for Sipeed SLogic logic analyzers, **`scopecap`** drives a ToupTek USB3 microscope camera for live mosaic stitching, and [`lsdk`](blockchain.md#lsdk) uses rawusb as its Linux usbfs fallback for BOLOS hardware wallets.
 
 ## Quick pick
 | Need | Use |
@@ -315,11 +315,11 @@ fn main() -> usbmagic::Result<()> {
 
 ## visgrok
 
-**Repo:** https://github.com/KarpelesLab/visgrok · **Crate:** `visgrok` library + `visgrok` CLI (crates.io `0.1.1`; the scripting query commands and the Ledger SEPROXYHAL decoder are on master only, so install from git for them) · **License:** MIT · **MSRV:** 1.89 · **Status:** usable, actively developed.
+**Repo:** https://github.com/KarpelesLab/visgrok · **Crate:** `visgrok` library + `visgrok` CLI (crates.io `0.1.2`) · **License:** MIT · **MSRV:** 1.89 · **Status:** usable, actively developed.
 
 A from-scratch driver and analyzer for **Sipeed SLogic logic analyzers** (SLogic16 U3, SLogic32 U3, SLogic Combo 8), built on `rawusb`, with no sigrok or vendor library. It streams continuously to disk in its own compressed `.vgk` format (typically 30x to 25 000x smaller than raw, compressed with `compcol`), decodes protocols in real time, and has a terminal UI (ratatui), a web UI, and one-shot JSON query commands meant for scripts and agents. It reads and writes sigrok `.sr` sessions (PulseView), `.vcd` and raw `.bin`.
 
-Decoders: UART (automatic baud detection that follows rate changes), SPI (including SSD1306 OLED framebuffers rendered to PNG), I2C, native SD card bus (commands, CRC7/CRC16, data blocks), ISO 7816 smart cards (ATR, PPS, T=1), and on master Ledger's secure-element/MCU link (SEPROXYHAL packets, reassembled APDUs). Roles can be auto-detected (`--auto`).
+Decoders: UART (automatic baud detection that follows rate changes), SPI (including SSD1306 OLED framebuffers rendered to PNG), I2C, native SD card bus (commands, CRC7/CRC16, data blocks), ISO 7816 smart cards (ATR, PPS, T=1), and Ledger's secure-element/MCU link (SEPROXYHAL packets, reassembled APDUs). Roles can be auto-detected (`--auto`).
 
 **Use it when:**
 - An agent has to read a hardware bus: record with a SLogic and then ask questions of the capture as JSON.
@@ -333,7 +333,7 @@ Decoders: UART (automatic baud detection that follows rate changes), SPI (includ
 
 **Install / run:**
 ```sh
-cargo install visgrok                                      # 0.1.1; or: cargo install --git https://github.com/KarpelesLab/visgrok
+cargo install visgrok                                      # 0.1.2; or: cargo install --git https://github.com/KarpelesLab/visgrok
 visgrok --list
 visgrok -c 16 -t 1.65 -o capture.vgk --auto                # record 16 channels at 200 MHz, 1.65 V threshold, auto roles
 visgrok -i capture.vgk --headless --auto                   # replay through the analyzers
@@ -342,7 +342,7 @@ visgrok --demo --auto                                      # synthetic UART/I2C/
 visgrok web                                                # browser UI on http://127.0.0.1:8090/
 ```
 
-**Querying a capture (git master):** each command takes the capture file, uses the roles saved in its sidecar (`capture.vgk.json`; override with `-r CH=ROLE`), and prints JSON with `--json`. Times are seconds (`39.67`), with a unit (`120ms`) or a sample index (`#7935109874`).
+**Querying a capture (since 0.1.2):** each command takes the capture file, uses the roles saved in its sidecar (`capture.vgk.json`; override with `-r CH=ROLE`), and prints JSON with `--json`. Times are seconds (`39.67`), with a unit (`120ms`) or a sample index (`#7935109874`).
 ```sh
 visgrok summary capture.vgk --json             # channels, activity, buses, decoders, sessions
 visgrok events capture.vgk --from 39.6 --to 39.7 --json

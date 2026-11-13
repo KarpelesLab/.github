@@ -389,9 +389,9 @@ if !asm.finish() || asm.diags().has_errors() {
 
 ## reticle
 
-**Repo:** https://github.com/KarpelesLab/reticle · **Crate:** `reticle` (crates.io `0.0.7`) · **License:** MIT · **Status:** early. The full pipeline runs end to end, and designs have been run on real FPGAs (Basys 3/Artix-7, Cynthion/ECP5, Tang Primer 20K/Gowin, and the programmable logic of a Zynq UltraScale+ ZCU104).
+**Repo:** https://github.com/KarpelesLab/reticle · **Crate:** `reticle` (crates.io `0.0.8`) · **License:** MIT · **Status:** early. The full pipeline runs end to end, and designs have been run on real FPGAs (Basys 3/Artix-7, Cynthion/ECP5, Tang Primer 20K/Gowin, and the programmable logic of a Zynq UltraScale+ ZCU104).
 
-A from-scratch **Verilog-2005/SystemVerilog and VHDL-2008 compiler**. The default build has **zero dependencies** and a sans-I/O library core; `unsafe` is denied except in the C ABI and wasm modules. Both languages lower to one IR, which feeds a 4-state event-driven simulator (VCD/FST, SVA/PSL subset, coverage), synthesis (FF/memory/FSM inference, AIG optimizer, LUT and standard-cell mapping), formal verification (in-crate CDCL SAT: BMC, k-induction, equivalence), static timing and CDC analysis, and FPGA/ASIC back ends. It also has an IP manifest/registry system, formatters, an LSP server, an HTML schematic viewer, a C ABI and a WASM build. It can write Xilinx 7-series (Project X-Ray), Zynq UltraScale+ (Project U-Ray; a `.bin` for Linux's FPGA manager, with the clock network still borrowed from the board's PYNQ image via `--borrow-clock`), ECP5 (Trellis) and Gowin (Apicula) bitstreams, and program boards over JTAG with no vendor tools. 7-series mapping covers DSP48E1, PLLE2/MMCME2, block RAM, XADC and LVDS. IP dependencies resolve into a lock file (`reticle build --locked` fails instead of rewriting it).
+A from-scratch **Verilog-2005/SystemVerilog and VHDL-2008 compiler**. The default build has **zero dependencies** and a sans-I/O library core; `unsafe` is denied except in the C ABI and wasm modules. Both languages lower to one IR, which feeds a 4-state event-driven simulator (VCD/FST, SVA/PSL subset, coverage), synthesis (FF/memory/FSM inference, AIG optimizer, LUT and standard-cell mapping), formal verification (in-crate CDCL SAT: BMC, k-induction, equivalence), static timing and CDC analysis, and FPGA/ASIC back ends. It also has an IP manifest/registry system, formatters, an LSP server, an HTML schematic viewer, a C ABI and a WASM build. It can write Xilinx 7-series (Project X-Ray), Zynq UltraScale+ (Project U-Ray; a `.bin` for Linux's FPGA manager, with the clock network still borrowed from the board's PYNQ image via `--borrow-clock`), ECP5 (Trellis) and Gowin (Apicula) bitstreams, and program boards over JTAG with no vendor tools. 7-series mapping covers DSP48E1, PLLE2/MMCME2, block RAM, XADC and LVDS. IP dependencies resolve into a lock file (`reticle build --locked` fails instead of rewriting it). Since 0.0.8, 7-series timing uses a delay model fitted against Vivado at the part's speed grade (`--speed-grade`), and synthesis follows Vivado's netlist choices by default (`--synthesis vivado`; `--synthesis legacy` restores the earlier netlist).
 
 **Use it when:** you want to lint, simulate, synthesize or formally check HDL from Rust or the command line, write HDL testbenches as Rust `#[test]`s, or run an open FPGA flow without vendor tools.
 **Don't use it when / limits:** you need full-coverage vendor-grade P&R or timing closure. Parts of VHDL (VUnit/UVVM/OSVVM testbenches) are unsupported. Bitstream generation is proven only on small designs (for example, a carry chain does not yet route on 7-series). MSRV 1.89.
@@ -415,7 +415,7 @@ reticle fmt --write counter.v ; reticle lsp
 **Add it (library):**
 ```toml
 [dependencies]
-reticle = { version = "0.0.7", default-features = false, features = ["verilog", "sim"] }
+reticle = { version = "0.0.8", default-features = false, features = ["verilog", "sim"] }
 ```
 
 **Key features / cargo features:** `verilog`, `vhdl`, `sim`, `synth` (default together with `cli`); `formal`, `fpga`, `asic`, `timing`, `ip`, `lsp`, `cache`, `viewer`, `ffi`, `wasm`. Only `program` (adds `rawusb`) and `apicula` (adds `compcol`) pull in a dependency, and both are off by default.
@@ -440,7 +440,7 @@ assert_eq!(m.name.name, "m");
 
 ## univdreams
 
-**Repo:** https://github.com/KarpelesLab/univdreams · **Crate:** `univdreams` (crates.io `0.5.0`; binary `ud` behind the default `cli` feature) · **License:** MIT · **Status:** usable for its core promise (byte-identical round-trip). High-level decompilation is partial. MSRV 1.89 (edition 2024)
+**Repo:** https://github.com/KarpelesLab/univdreams · **Crate:** `univdreams` (crates.io `0.5.1`; binary `ud` behind the default `cli` feature) · **License:** MIT · **Status:** usable for its core promise (byte-identical round-trip). High-level decompilation is partial. MSRV 1.89 (edition 2024)
 
 A compiler **and** decompiler suite. It decompiles a binary to `.ud` source whose directives pin the compiler's choices (encodings, layout, padding), so that recompiling reproduces the input **byte for byte**. Formats: ELF64 (x86-64, x86, aarch64; any other ELF machine round-trips with its code kept opaque), PE/COFF (MSVC/MinGW), thin Mach-O (x86-64, arm64), 16-bit Windows NE, raw 6502, and EVM bytecode (`ud evm <address|deploy tx hash>` fetches, decompiles, and recompiles a contract). It lifts to structured statements (if/switch/goto, calls with argument folding), reads DWARF signatures, and discovers functions via symtab, eh_frame, exports and signatures. It also includes a sandboxed **i386 Win32 emulator** and a Linux user-mode personality for static ELF guests (i386 wired today), with an optional KVM backend. Runs in the browser: https://karpeleslab.github.io/univdreams/. Dependencies include `iced-x86` and `gimli`, so it is not dependency-free.
 
@@ -477,6 +477,7 @@ Variants: `Guest::load_raw` (skip DllMain), `load_into`/`load_raw_into` (bring y
 
 **Gotchas:**
 - The 16 `ud-*` crates were folded into `univdreams` on 2026-10-05 and are frozen at 0.3.0 on crates.io. Code using `ud_emulator::Guest` or `cargo install ud-cli` should move to `univdreams::emulator::Guest` and `cargo install univdreams`.
+- Master (not yet released) adds disassembly of SLEIGH-covered architectures through a vendored SLEIGH engine with Ghidra's processor specs, and big-endian ELF files.
 
 ## rsemu
 

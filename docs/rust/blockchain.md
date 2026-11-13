@@ -3,10 +3,12 @@
 Pure-Rust crates for building multi-chain cryptocurrency wallets, all built on
 [`purecrypto`](https://github.com/KarpelesLab/purecrypto) for their cryptography (no C code, no OpenSSL). `tsslib`
 provides threshold signing (MPC), `outscript` provides addresses, scripts and transaction building/signing for many
-chains, `ethrpc-rs` talks JSON-RPC to EVM nodes, and `zanolib` covers Zano. `libwallet` is the application that
+chains (including Zano, Monero and shielded Zcash since 0.3), `ethrpc-rs` talks JSON-RPC to EVM nodes, and `lsdk`
+drives BOLOS hardware wallets (genuine check, app/firmware management, EVM/BTC/Solana signing). `zanolib` (Zano) is
+archived in favor of outscript's `zano` module. `libwallet` is the application that
 ties them together (a TSS wallet backend exposed over C FFI/WASM). The rest are narrower: `evmabiless` (recovers the
-ABI from EVM bytecode, decodes calldata), `erigon-seg` (Erigon 3 snapshot files) and `chiefsplitter` (an on-chain
-Solana program). `outscript` and `ethrpc-rs` are ports of Go libraries in KarpelesLab
+ABI from EVM bytecode, decodes calldata), `erigon-seg` (Erigon 3 snapshot files), `btcwallet` (a read-only
+`wallet.dat` inspector) and `chiefsplitter` (an on-chain Solana program, now in TibaneLabs). `outscript` and `ethrpc-rs` are ports of Go libraries in KarpelesLab
 ([outscript](https://github.com/KarpelesLab/outscript), [ethrpc](https://github.com/KarpelesLab/ethrpc)). `tsslib`
 started as a port of Go [tss-lib](https://github.com/KarpelesLab/tss-lib) (now archived) but no longer documents compatibility with it.
 
@@ -16,9 +18,9 @@ started as a port of Go [tss-lib](https://github.com/KarpelesLab/tss-lib) (now a
 | Threshold (t-of-n) signatures: FROST Ed25519/ristretto255, DKLs23 ECDSA, threshold ML-DSA | [`tsslib`](#tsslib-rs) |
 | Threshold BIP340 Schnorr / Bitcoin Taproot key-path signing (FROST secp256k1) | [`tsslib`](#tsslib-rs) (`frostsecp256k1tss`) |
 | Migrate existing GG18/GG20 ECDSA or GG18-style EdDSA key shares | [`tsslib`](#tsslib-rs) (`ecdsatss`, `eddsatss`) |
-| Derive addresses from a pubkey (BTC-family, EVM, Solana, Cardano, Massa, Tron, Zcash) | [`outscript`](#outscript-rs) |
+| Derive addresses from a pubkey (BTC-family, EVM, Solana, Cardano, Massa, Tron, Zcash, Monero, Zano) | [`outscript`](#outscript-rs) |
 | Parse/validate a crypto address for many chains | [`outscript`](#outscript-rs) |
-| Build and sign BTC / PSBT / Taproot / EVM / Solana / Cardano / Tron / Zcash-transparent transactions | [`outscript`](#outscript-rs) |
+| Build and sign BTC / PSBT / Taproot / EVM / Solana / Cardano / Tron / Zcash (transparent and shielded) / Monero / Zano transactions | [`outscript`](#outscript-rs) |
 | Move PSBTs as QR codes (UR / BBQr) | [`outscript`](#outscript-rs) |
 | no_std / no-alloc transaction signing (hardware wallet, embedded) | [`outscript`](#outscript-rs) |
 | Async JSON-RPC to Ethereum/EVM nodes (native Tokio or browser WASM) | [`ethrpc-rs`](#ethrpc-rs) |
@@ -27,7 +29,9 @@ started as a port of Go [tss-lib](https://github.com/KarpelesLab/tss-lib) (now a
 | Guess the ABI of a deployed contract from its bytecode | [`evmabiless`](#evmabiless) |
 | Decode EVM tx calldata for display (no_std, no alloc) | [`evmabiless`](#evmabiless) |
 | Read/write/merge Erigon 3 `.kv` / `.bt` / `.kvei` snapshot files | [`erigon-seg`](#erigon-seg) |
-| Zano: addresses, offline signing, deposit scanning, sending, MPC spend key | [`zanolib`](#zanolib) |
+| Zano: addresses, keys, scanning, offline signing, building | [`outscript`](#outscript-rs) (`zano` module; [`zanolib`](#zanolib) is archived) |
+| Sign with or manage a BOLOS hardware wallet from Rust or the browser | [`lsdk`](#lsdk) |
+| Inspect an old Bitcoin Core `wallet.dat` without Bitcoin Core or libdb | [`btcwallet`](#btcwallet) |
 | Full TSS wallet backend for a mobile/desktop/web app (Dart/Flutter client) | [`libwallet`](#libwallet) |
 | On-chain SOL/SPL fee splitter (Solana program) | [`chiefsplitter`](#chiefsplitter) |
 
@@ -128,11 +132,12 @@ let saved = keys[0].to_json()?;                        // stable JSON save forma
 
 ## outscript-rs
 
-**Repo:** https://github.com/KarpelesLab/outscript-rs · **Crate:** `outscript` (crates.io `0.2.7`) · **License:** MIT · **Status:** usable. It is actively developed and verified against BIP-174 test vectors.
+**Repo:** https://github.com/KarpelesLab/outscript-rs · **Crate:** `outscript` (crates.io `0.3.0`) · **License:** MIT · **Status:** usable. It is actively developed and verified against BIP-174 test vectors.
 
 A Rust port of Go [`outscript`](https://github.com/KarpelesLab/outscript). It generates output scripts and
 addresses, parses addresses, and builds and signs transactions for Bitcoin-family chains (BTC, BCH, LTC, DOGE,
-Namecoin, Monacoin, Dash, Electraproto), EVM, Solana, Cardano, Massa, Tron and Zcash (transparent only). It is
+Namecoin, Monacoin, Dash, Electraproto), EVM, Solana, Cardano, Massa, Tron, Zcash (transparent, Sapling and
+Orchard/Ironwood shielded), Monero and Zano. It is
 `#![no_std]`, and a heap-free core covers keys, signing, addresses, PSBT, raw BTC/EVM/Zcash transactions, and
 UR/BBQr parts. All crypto comes from `purecrypto`. Edition 2024, MSRV 1.95.
 
@@ -141,14 +146,14 @@ chains in one dependency; PSBT workflows (create, update, sign, combine, finaliz
 and script paths; signing through external signers (the `Signer::sign_taproot`, `PsbtSigner` and `CardanoSigner`
 traits work with TSS or HSMs); or embedded/hardware-wallet targets with no allocator.
 **Don't use it when / limits:** you need node or network access (pair it with `ethrpc-rs` or another RPC client),
-Zcash shielded (Sapling/Orchard) spends, or Cardano Plutus, certificates or metadata. There is no coin selection.
+or Cardano Plutus, certificates or metadata. There is no coin selection. Monero multisig is experimental.
 
 **Add it:**
 ```toml
 [dependencies]
-outscript = "0.2"
+outscript = "0.3"
 # only some chains, no_std with alloc:
-# outscript = { version = "0.2", default-features = false, features = ["alloc", "bitcoin", "evm"] }
+# outscript = { version = "0.3", default-features = false, features = ["alloc", "bitcoin", "evm"] }
 ```
 
 **Key features / cargo features:**
@@ -156,12 +161,15 @@ outscript = "0.2"
   types, RLP/CBOR/JSON, multi-part UR/BBQr), and none (a heap-free core that writes into caller buffers:
   `generate_script`, `address::encode_address_to_slice`, `psbt::Psbt`, `btcraw::RawTx`, `evmraw::RawEvmTx`,
   `zcashtx::ZcashTx`).
-- Chain features: `bitcoin`, `evm`, `solana`, `cardano`, `massa`, `zcash`, `tron` (added in 0.2.6). Transport features: `bcur` (Uniform
+- Chain features: `bitcoin`, `evm`, `solana`, `cardano`, `massa`, `zcash`, `tron` (added in 0.2.6), `monero` and
+  `zano` (0.3, via `cryptonote`). Zcash shielded: `zcash-sapling`, `zcash-orchard` (both default), `zcash-shielded`,
+  `zcash-sapling-prover` (needs the Sapling parameters at run time) and `zcash-orchard-prover` (both non-default). Transport features: `bcur` (Uniform
   Resources) and `bbqr` (Coinkite BBQr). Curve features: `secp256k1`, `ed25519`. All chain and transport features
   are on by default.
 - Transaction types: `BtcTx` + `BtcTxSign`, `psbt::Psbt`, `taproot` (script trees, control blocks),
   `EvmTx` / `RawEvmTx` (legacy, EIP-2930, EIP-1559), `solana::new_solana_tx` / `_v0` / `_v1`, `CardanoTx`
-  (including CIP-1852 HD derivation via `cardano_icarus_master_key`), `zcashtx::ZcashTx` (v5, ZIP-244), and
+  (including CIP-1852 HD derivation via `cardano_icarus_master_key`), `zcashtx::ZcashTx` (v5, ZIP-244; v6, ZIP-229), `zcash_builder::Builder`
+  (shielded), `monero::TransactionBuilder`, `zano::Wallet`, and
   `trontx::TronTx` (protobuf transactions: TRX, TRC-10, TRC-20 / smart-contract calls; addresses via `parse_tron_address`).
 - Also supports Bitcoin Knots unified sighash (`btcraw::SIGHASH_UNIFIED`). `SecpPrivateKey` and
   `CardanoExtendedKey` zeroize on drop.
@@ -186,8 +194,15 @@ let signed = tx.bytes();
 - With `default-features = false`, every chain is disabled too, so name the ones you need. Formats for disabled
   chains are simply "unknown".
 - Taproot and unified-sighash inputs need `.amount(..)` and `.prev_script(..)` on `BtcTxSign`.
-- Some `no_std` snippets in the README still say `version = "0.1"`. The current version is 0.2.
-- 0.2.7 requires `purecrypto` ^0.10. Keep `purecrypto` at 0.10 across the whole graph (tsslib 0.2.16+ needs it too), or you get two copies whose types don't mix.
+- Some `no_std` snippets in the README still say `version = "0.1"`. The current version is 0.3.
+- `EvmTx` and `CardanoTx` are `#[non_exhaustive]` since 0.2.8: start from `EvmTx::default()` /
+  `CardanoTx::default()` and assign fields; struct literals no longer compile outside the crate. 0.3 also dropped the `p2wsh:p2wpkh` format,
+  `EvmTx::sign` refuses a transaction with no chain id, and unimplemented ECDSA sighash types return
+  `UnsupportedSighash`.
+- The default `bbqr` feature turns on `compcol` 0.8's `embed` feature graph-wide, so every compcol 0.8 user in the
+  same build (for example purecrypto's `cert-compression`) gets the small heap-free deflate. Use
+  `default-features = false` without `bbqr` if that matters.
+- 0.3.0 requires `purecrypto` ^0.10. Keep `purecrypto` at 0.10 across the whole graph (tsslib 0.2.16+ needs it too), or you get two copies whose types don't mix.
 
 ## ethrpc-rs
 
@@ -300,6 +315,86 @@ for kv in r.iter() {
   page cache.
 - Check `total_bytes()` against free memory before calling `preload_all`.
 
+## lsdk
+
+**Repo:** https://github.com/KarpelesLab/lsdk · **Crate:** `lsdk` library + `lsdk` CLI (crates.io `0.1.1`; HW.1 / original Nano support (`btchip` feature, `lsdk hw1 …`), `app load --legacy-layout` and `ca install --regular` are on master only, so install from git for them) · **License:** MIT (the Bitcoin client-command interpreter `src/apps/btc/merkle.rs` is a port of the vendor's Apache-2.0 reference client) · **MSRV:** 1.95, edition 2024 · **Status:** usable, very new (first release 2026-11-10) and moving fast. Web console: https://karpeleslab.github.io/lsdk/
+
+A Rust SDK, CLI and browser console for hardware wallets that run the BOLOS operating system (Nano S, Nano S Plus, Nano X, Stax, Flex, Nano Gen5), over native USB HID or WebHID from wasm. It covers the dashboard (device info, list/open/quit apps, rename, battery, language packs, screensaver, raw APDUs), genuine checks (online through the vendor HSM over websocket, or **offline** by verifying the device attestation against pinned issuer keys), app install/uninstall and firmware updates through the vendor HSM, the dashboard secure channel (custom CA, sideloading apps from their ELF, memory info, endorsement keys), self-hosted seed backup through the Recover protocol (your own CA as the backup service), and app clients for Ethereum/EVM, Bitcoin (wallet policies, PSBT) and Solana. Transactions are built with [`outscript`](#outscript-rs), crypto comes from [`purecrypto`](https://github.com/KarpelesLab/purecrypto), HTTP and the HSM websocket go through `rsurl`, and on Linux it falls back to raw usbfs through [`rawusb`](ui-hardware.md#rawusb) when the hidraw node is not accessible. Not affiliated with the device manufacturer.
+
+**Use it when:** you need to drive a BOLOS hardware wallet from Rust or the browser: derive and display addresses, sign EVM / PSBT / Solana transactions on the device, run an offline genuine check, manage apps and firmware without the vendor's desktop app, or sideload your own app during development.
+**Don't use it when / limits:** no BLE or emulator (Speculos) transport ships; `Transport` is a one-method trait, so you can add one. Only the Ethereum, Bitcoin and Solana app clients exist (plus legacy BTChip on master). The HSM operations (online genuine check, install, firmware) depend on the vendor's servers. Vendor endorsement (`endorse setup --vendor`) did not work as of 2026-11 (the HSM sends an empty certificate; lsdk refuses to forward it). A genuine check proves the secure element and its firmware, not that the rest of the device is free of added hardware.
+
+**Add it:**
+```toml
+[dependencies]
+lsdk = { version = "0.1", features = ["manager", "attestation", "eth"] }   # default = ["hid"]
+tokio = { version = "1", features = ["rt", "macros"] }   # any executor works; lsdk does not need tokio
+hex = "0.4"                                              # only for the example output
+```
+```sh
+cargo install lsdk --features cli                                    # 0.1.1
+cargo install --git https://github.com/KarpelesLab/lsdk --features cli   # master (HW.1 support)
+lsdk info; lsdk genuine --offline; lsdk install Bitcoin; lsdk eth address --display
+```
+Native HID on Linux needs `libudev` and a udev rule for vendor id `2c97` (the README gives it); the browser console needs a Chromium-based browser.
+
+**Key features / cargo features:**
+- core (always): `Device<T: Transport>` dashboard commands (`get_version`, `list_apps`, `open_app`, `get_battery_status`, …), `Apdu`/`Response`/`StatusWord`, HID framing, `DeviceModel`, `path::DerivationPath` (`FromStr`).
+- `hid` (default): `transport::hid::HidTransport` (`open_first`, `list`, `open`, `wait_and_open`, `open_usbfs`). `webhid`: `WebHidTransport` (wasm32).
+- `attestation`: `attestation::offline_genuine_check(&device, &extra_issuers, &mut on_event) -> Attestation { genuine, issuer, proof_of_possession, .. }`, no network.
+- `manager` (= `manager-api` + `hsm`): `manager::Manager` (`Default` = vendor endpoints) with `genuine_check`, `install_app`, `install_app_with_deps`, `uninstall_app_by_name`, `check_firmware_update`, `install_osu`, language packs.
+- `scp`: secure channel (`setup_custom_ca`, `list_apps`, `delete_app`, `hash_firmware`, …); `loader`: `AppImage::from_elf` / `from_ihex` for sideloading; `recover`: Recover-protocol seed backup with your own CA.
+- `eth`, `btc`, `sol`, `apps`: `apps::eth::EthApp`, `apps::btc::BtcApp` (`default_policy`, `register_wallet`, `get_wallet_address_checked`, `sign_psbt`; `apps::btc::psbt::build_psbt`), `apps::sol::SolApp`. On master `apps` also enables `btchip`.
+- `full` (everything native), `wasm` (JS bindings for the web console), `cli`, `serde`.
+
+**Example (verified to compile against crates.io 0.1.1; not run against a device):**
+```rust
+use lsdk::{Device, transport::hid::HidTransport, manager::Manager, attestation::offline_genuine_check};
+use lsdk::apps::eth::{EthApp, EvmTx, EvmTxType, parse_units};
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> lsdk::Result<()> {
+    let device = Device::new(HidTransport::open_first()?);
+    let os = device.get_version().await?;
+    println!("{} SE {}", os.model().map(|m| m.name()).unwrap_or("?"), os.se_version);
+
+    // Offline genuine check: attestation verified against pinned issuer keys.
+    let att = offline_genuine_check(&device, &[], &mut |ev| println!("{ev:?}")).await?;
+    println!("genuine: {} (issuer {:?})", att.genuine, att.issuer);
+
+    // Vendor HSM over websocket; the user approves on the device.
+    let manager = Manager::default();
+    manager.install_app_with_deps(&device, "Ethereum", None, &mut |_, ev| println!("{ev:?}")).await?;
+
+    device.open_app("Ethereum").await?;
+    let eth = EthApp::new(&device);
+    let path = "m/44'/60'/0'/0/0".parse()?;
+    println!("address {}", eth.get_address(&path, false, false).await?.address);
+
+    let mut tx = EvmTx::default(); // #[non_exhaustive]: assign fields, no struct literal
+    tx.tx_type = EvmTxType::Eip1559;
+    tx.chain_id = 1;
+    tx.nonce = 0;
+    tx.to = "0x000000000000000000000000000000000000dEaD".into();
+    tx.value = parse_units("0.01", 18)?;
+    tx.gas = 21_000;
+    tx.gas_tip_cap = parse_units("1", 9)?;
+    tx.gas_fee_cap = parse_units("30", 9)?;
+    eth.sign_tx(&path, &mut tx).await?;                   // signature is written into tx
+    let raw = tx.to_bytes().map_err(|e| lsdk::Error::App(format!("{e:?}")))?;
+    println!("{}", hex::encode(raw));                     // ready to broadcast
+    Ok(())
+}
+```
+
+**Gotchas:**
+- The README examples are out of date: `install_app_with_deps` takes an `installed: Option<&[String]>` argument before the callback, and `EvmTx` is `#[non_exhaustive]` (outscript ≥ 0.2.8), so `EvmTx { .., ..Default::default() }` does not compile outside outscript. Build it from `EvmTx::default()`. `EvmTx::to_bytes()` returns `Result<_, outscript::Error>`, which has no `From` conversion into `lsdk::Error`.
+- Many dashboard commands prompt the user on the device (listing apps, reading the device name, opening the secure channel). The library never lists apps implicitly for that reason. Pass `installed` if you know it.
+- Manager/HSM and secure-channel operations require the device to be on the dashboard (`Error::DashboardExpected`); app clients need the app open (`device.open_app("Ethereum")`).
+- While a custom CA is installed, vendor app installs fail (`0x6804`) and on some devices vendor HSM sessions are refused; `lsdk ca remove` first. Setting the PIN during onboarding erases a custom CA.
+- `HidTransport::exchange` is `async` in name only: it blocks the calling thread on hidapi until the device answers (which includes waiting for the user to confirm). `Transport` is an `async fn` trait with no `Send` bound, so code generic over `T: Transport` cannot `tokio::spawn` its futures; a current-thread runtime is the simplest fit.
+- The raw-usbfs fallback detaches the kernel HID driver from the interface while open and re-attaches it on drop.
+
 ## libwallet
 
 **Repo:** https://github.com/KarpelesLab/libwallet · **Crate:** `libwallet` (not on crates.io; built as `cdylib`/`staticlib`/`rlib` from `rust/`). The Dart client is on pub.dev as `libwallet`. · **License:** Karpeles Lab Non-Commercial (free for personal, educational, and under 10k MAU; commercial use requires a license) · **Status:** usable application backend, still evolving.
@@ -339,9 +434,34 @@ make dart-native  # stage the native lib for the local Dart client
 requires `purecrypto` 0.10 across the whole graph (the Rust workspace pins `0.10.1` and MSRV 1.95). Open TODOs include reshare improvements, Token-2022 transfer
 fees, and Bitcoin transaction history.
 
+## btcwallet
+
+**Repo:** https://github.com/KarpelesLab/btcwallet · **Crate:** none; binary-only (no `lib.rs`), git only. The name `btcwallet` is not registered on crates.io · **License:** MIT · **MSRV:** 1.95, edition 2024 · **Status:** working CLI (2 commits, 2026-11-09). Its unit and CLI tests pass offline against a BDB 4.8 fixture.
+
+A read-only command-line inspector for legacy Bitcoin Core / Bitcoin-Qt `wallet.dat` files (Berkeley DB 4.8, also the forks: Litecoin, Dogecoin, Namecoin, testnet, regtest). It parses the Berkeley DB btree itself (no libdb, no Bitcoin Core) and prints the wallet version, encryption parameters (master-key KDF, iterations, salt), HD chain, keys with their addresses, key pool, address book, transactions, scripts, watch-only entries, accounts and descriptors. It **never prints private keys** and does not need the passphrase. `--salvage` scans every leaf page of damaged or truncated files. `--balance` (off by default) sends every wallet address to the modchain `modchain_assets` JSON-RPC endpoint and totals the UTXOs. Its only dependencies are [`outscript`](#outscript-rs) (address encoding) and [`purecrypto`](https://github.com/KarpelesLab/purecrypto) (hashing, and TLS for its built-in HTTP client).
+
+**Use it when:** you need to find out what an old `wallet.dat` contains (which addresses, whether it is encrypted or HD, key dates) or whether it still holds funds, without installing Bitcoin Core or libdb.
+**Don't use it when / limits:** it does not decrypt or export keys and cannot spend or sweep. It reads only BDB wallets, not the SQLite descriptor wallets of current Bitcoin Core. It is a binary, so it cannot be used as a library. `--balance` reveals every wallet address to the balance service.
+
+**Install / run:**
+```sh
+cargo install --git https://github.com/KarpelesLab/btcwallet
+btcwallet wallet.dat            # summary
+btcwallet -k -a wallet.dat      # keys, with P2SH-P2WPKH and P2WPKH forms of compressed keys
+btcwallet -l -t wallet.dat      # address book, transaction ids
+btcwallet -s -k damaged.dat     # salvage mode
+btcwallet -b wallet.dat         # online balance lookup (privacy: sends all addresses)
+```
+Flags: `-n/--network` (bitcoin, testnet, regtest, litecoin, dogecoin, namecoin; guessed from the address book by default), `-d/--db` (sub-database), `-r/--records` (raw records as hex, private keys redacted), `--balance-url` (`{chain}` is replaced by the chain name), `--timeout`.
+
+**Gotchas:**
+- Work on a copy, and not on a wallet Bitcoin Core has open: recent changes may still be in the BDB log files and not yet in `wallet.dat`.
+- `--salvage` may return stale records from freed pages.
+- HTTPS uses the system CA bundle (`SSL_CERT_FILE` overrides it) and honours `https_proxy` / `no_proxy`.
+
 ## chiefsplitter
 
-**Repo:** https://github.com/KarpelesLab/chiefsplitter · **Crate:** `chiefsplitter` (Solana on-chain program, not on crates.io) · **License:** MIT · **Status:** usable. It has reproducible `solana-verify` builds and a `security_txt`.
+**Repo:** https://github.com/TibaneLabs/chiefsplitter (moved from KarpelesLab to the sister org Tibane Labs in November 2026) · **Crate:** `chiefsplitter` (Solana on-chain program, not on crates.io) · **License:** MIT · **Status:** usable. It has reproducible `solana-verify` builds and a `security_txt`.
 
 A native Solana program (not Anchor; `solana-program` 2.0 with borsh instructions) that splits SOL and
 SPL/Token-2022 tokens between up to 10 recipients by basis-point shares. Anyone can create any number of splitter
@@ -382,7 +502,12 @@ admin-only CPI restricted to the Bonfida SNS program.
 
 ## zanolib
 
-**Repo:** https://github.com/KarpelesLab/zanolib · **Crate:** `zanolib` (crates.io `0.3.0`) · **License:** MIT · **Status:** usable. It is tested against about 1.9k KAT vectors and mainnet transactions from every era. Threshold broadcast is not complete.
+**Repo:** https://github.com/KarpelesLab/zanolib · **Crate:** `zanolib` (crates.io `0.3.0`) · **License:** MIT · **Status:** **archived** (read-only since November 2026; its README has no successor note).
+
+> **Use [`outscript`](#outscript-rs)'s `zano` module (0.3+) for new code.** It started as a port of zanolib and covers
+> addresses, keys, scanning, offline signing, building, full verification and blocks (`outscript::zano::Wallet`).
+> It does **not** port zanolib's `zanorpc` client or its `zanompc` threshold signer; `InputSigner` is the hook a
+> threshold signer plugs into. The rest of this section describes the archived crate.
 
 A Rust library for [Zano](https://zano.org/) (a CryptoNote-family chain). It covers address handling (standard,
 integrated, auditable), offline signing of view-only-wallet transactions, deposit scanning with only the view key,

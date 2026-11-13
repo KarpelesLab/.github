@@ -219,7 +219,7 @@ assert_eq!(pi.to_decimal_string(20), "3.14159265358979323846");
 
 ## z3rs
 
-**Repo:** https://github.com/KarpelesLab/z3rs · **Crate:** `z3rs` (crates.io `0.0.10`) · **License:** MIT (derivative of Microsoft's MIT-licensed Z3) · **Status:** experimental to usable (all Z3 theories present and sound, 0 known wrong verdicts across about 90k differential-fuzzed scripts, completeness and performance still behind upstream)
+**Repo:** https://github.com/KarpelesLab/z3rs · **Crate:** `z3rs` (crates.io `0.0.11`) · **License:** MIT (derivative of Microsoft's MIT-licensed Z3) · **Status:** experimental to usable (all Z3 theories present and sound, 0 known wrong verdicts across about 90k differential-fuzzed scripts, completeness and performance still behind upstream)
 
 A pure-Rust, `no_std` + `alloc` port of the Z3 theorem prover, pinned to Z3 v4.17.0 and ported file by file. There is no GMP, no C and no `-sys` crate, and the only dependency is `puremp`. It includes a full SMT-LIB 2 front end, a CDCL SAT core (DIMACS, DRAT checking), DPLL(T) with Nelson-Oppen, and theories for UF, LIA/LRA, NRA (CAD), NIA, bit-vectors, arrays, datatypes, floating point, strings/sequences/regex, quantifiers (E-matching), CHC/Horn, Datalog and optimization. It also has a Z3-compatible CLI and a C ABI subset of `z3_api.h`.
 
@@ -229,8 +229,8 @@ A pure-Rust, `no_std` + `alloc` port of the Z3 theorem prover, pinned to Z3 v4.1
 **Add it:**
 ```toml
 [dependencies]
-z3rs = "0.0.10"
-# z3rs = { version = "0.0.10", features = ["std"] }   # timers/threads/std::error::Error
+z3rs = "0.0.11"
+# z3rs = { version = "0.0.11", features = ["std"] }   # timers/threads/std::error::Error
 ```
 The CLI is `cargo install z3rs`, then `z3rs problem.smt2` or `z3rs problem.cnf`. Flags include `-dimacs`, `-dl` (Datalog), `-drat <cnf> <proof>` and `-memory:<MB>`, and the environment variable `Z3RS_MEMORY_LIMIT_MB` also sets a memory limit.
 
@@ -262,7 +262,7 @@ assert_eq!(ctx.check(), SatResult::Unsat);
 - `Solver` methods return `Result<_, String>` for parse and type errors. `SatResult::Unknown` means a budget ran out or the fragment is undecided, and it is never a guess.
 - The crate name is `z3rs`, not `z3`. The `z3` crate on crates.io is a different project that binds native Z3.
 - Version 0.0.x means the API may change between releases.
-- The 0.0.10 release depends on and re-exports `puremp ^0.2`, while puremp itself is at 0.3. Use the re-exported `z3rs::puremp` for values you pass to z3rs, or you will have two incompatible `Int` types. Master has moved to puremp 0.3 but that is not released yet.
+- 0.0.11 depends on and re-exports `puremp` ^0.3 (`z3rs::puremp`). Use that re-export, or depend on the same 0.3 line yourself, so the `Int` types match. (0.0.10 and earlier used puremp 0.2.)
 
 ## polyclip
 
@@ -328,4 +328,4 @@ fn main() -> polyclip::Result<()> {
 **Gotchas:**
 - `area2`/`ring_area2` return **twice** the signed area as `i128`.
 - Inputs can be any `RingSource` (`Ring`, `Polygon`, `PolygonSet`, slices of rings), so an `offset` result can be passed straight back in as a clip operand.
-- crates.io cadlab 0.0.2 requires `polyclip ^0.0.4` (master uses 0.0.6). Under Cargo's 0.0.x rules each patch release is semver-incompatible, so different versions do not unify in a dependency tree.
+- cadlab 0.0.3 depends on `polyclip` 0.0.6, the current release. Under Cargo's 0.0.x rules each patch release is semver-incompatible, so if you use polyclip next to cadlab, pin the same 0.0.x version or the types will not unify.

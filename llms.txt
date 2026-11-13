@@ -1,6 +1,6 @@
 # Karpeles Lab (KarpelesLab)
 
-> Open-source libraries and tools from Karpeles Lab Inc. (Tokyo), mostly Go and a fast-growing pure-Rust ecosystem: no C libraries, no FFI, often no_std with zero third-party crates. These docs tell AI coding agents which package fits a task, the exact crate/module name to depend on, maturity, and verified usage. Sister orgs: OxideAV (pure-Rust media framework) and portablesql (Go SQL toolkit).
+> Open-source libraries and tools from Karpeles Lab Inc. (Tokyo), mostly Go and a fast-growing pure-Rust ecosystem: no C libraries, no FFI, often no_std with zero third-party crates. These docs tell AI coding agents which package fits a task, the exact crate/module name to depend on, maturity, and verified usage. Sister orgs: OxideAV (pure-Rust media framework), portablesql (Go SQL toolkit) and TibaneLabs (wallets and Solana programs).
 
 Before depending on a Rust crate, check its section for the exact crate name (it often differs from the repo name) and whether it is on crates.io or git-only. Where a repo README disagrees with its source code, these docs follow the source.
 
@@ -65,7 +65,7 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 ## Rust: applications & engines
 
 - [argus](docs/rust/apps-engines.md#argus): experimental Rust web browser; headless CLI dumps text, links, forms, tables, JSON-LD, accessibility tree or PNG screenshots
-- [kataan](docs/rust/apps-engines.md#kataan): pure-Rust JavaScript/WASM engine (~99.99% Test262), embeddable library with host functions, C library, CLI/REPL
+- [kataan](docs/rust/apps-engines.md#kataan): pure-Rust JavaScript/WASM engine (~99.99% Test262, bytecode VM + x86-64 JIT), embeddable library with host functions, C library, CLI/REPL
 - [goro-rs](docs/rust/apps-engines.md#goro-rs): clean-room PHP interpreter in Rust (~94% of php-src tests pass), embeddable via goro-engine, with many goro-ext-* extensions
 - [mathesis](docs/rust/apps-engines.md#mathesis): Mathematica-style browser notebook with exact math (puremp) and SMT solving (z3rs)
 - [puregit](docs/rust/apps-engines.md#puregit): git library and CLI: objects, packs, refs, index, porcelain, LFS, smart protocol client and server over HTTP/SSH/git://
@@ -74,7 +74,7 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 - [x11anywhere](docs/rust/apps-engines.md#x11anywhere): experimental portable X11 server with Windows, macOS and nested backends
 - [cterm](docs/rust/apps-engines.md#cterm): terminal emulator for AI coding tools; headless `ctermd` gRPC daemon to drive terminal sessions and read the screen
 - [cadlab](docs/rust/apps-engines.md#cadlab): headless electronics CAD for programs and AI agents (one command registry as Rust API, CLI and MCP server; parts/BOM, ERC, placement, autorouter, DRC, Gerber/drill/IPC-2581/STEP)
-- [guide](docs/rust/apps-engines.md#guide): deterministic place-and-route engine shared by PCBs and FPGAs (negotiated-congestion multi-net router, VTR import, KiCad-compatible clearance checks; pre-alpha, git only)
+- [guide](docs/rust/apps-engines.md#guide): deterministic place-and-route engine shared by PCBs and FPGAs (negotiated-congestion multi-net router, VTR import, KiCad-compatible clearance checks; pre-alpha, crates.io 0.0.1 core, PCB routing/placement on git)
 - [ems](docs/rust/apps-engines.md#ems): clean-room FDTD electromagnetic solver replacing openEMS (drop-in `ems` CLI, runs openEMS XML, ports/S-parameters, NF2FF, SAR; HDF5 via hdf5rs; early development)
 - [csx](docs/rust/apps-engines.md#csx): zero-dependency CSXCAD/openEMS-compatible geometry and material modeling (primitives, dispersive materials, meshing, XML, STL/PLY/VTK)
 - [nanami](docs/rust/apps-engines.md#nanami): physically based speech and singing synthesizer (simulated vocal tract) driven by LLM-friendly NML markup; research prototype
@@ -86,7 +86,7 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 - [ldtray](docs/rust/ui-hardware.md#ldtray): tray icon, menu and notifications loading GUI libraries at runtime, so headless hosts get an error instead of a link failure
 - [rawusb](docs/rust/ui-hardware.md#rawusb): dependency-free libusb replacement (usbfs/WinUSB/IOKit), sync/async transfers, hotplug, HID/MSC/serial/UVC helpers
 - [usbmagic](docs/rust/ui-hardware.md#usbmagic): library and CLI for the Cynthion USB instrument: USB 2.0 capture to pcap, FPGA flashing, USB-PD tools
-- [visgrok](docs/rust/ui-hardware.md#visgrok): driver, recorder, protocol decoders (UART/SPI/I2C/SD/ISO 7816) and TUI/web UI for Sipeed SLogic logic analyzers; sigrok `.sr`/`.vcd` I/O; JSON capture queries for agents (git master)
+- [visgrok](docs/rust/ui-hardware.md#visgrok): driver, recorder, protocol decoders (UART/SPI/I2C/SD/ISO 7816) and TUI/web UI for Sipeed SLogic logic analyzers; sigrok `.sr`/`.vcd` I/O; JSON capture queries for agents
 - [scopecap](docs/rust/ui-hardware.md#scopecap): live microscope capture and multi-magnification mosaic stitching, with a pure-Rust ToupTek USB3 camera driver on rawusb (app, no license)
 
 ## Rust: AI tooling & databases
@@ -94,7 +94,7 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 - [atelier](docs/rust/ai-tools-databases.md#atelier): terminal AI coding agent for OpenAI-compatible APIs with confined tools, MCP client, sessions, headless --print mode
 - [carl](docs/rust/ai-tools-databases.md#carl): local MCP server giving agents hands (formerly manu): Google account access (Gmail, Calendar, Drive, Slides, Meet), agent-to-agent messaging, self-updating daemon
 - [mcptk](docs/rust/ai-tools-databases.md#mcptk): build MCP servers in Rust over stdio, Streamable HTTP (OAuth) and WebSocket, with typed tools, tasks, Claude Code channels and MCP Apps
-- [oxinfer](docs/rust/ai-tools-databases.md#oxinfer): pure-Rust local inference (Gemma/Qwen/Llama/Mistral/DeepSeek LLMs, embeddings, Stable Diffusion/FLUX/Qwen-Image editing, Whisper, Orpheus TTS); SIMD CPU with Metal/CUDA/WebGPU detected at run time; CLI, Rust API, OpenAI-compatible `oxinfer serve` (git master)
+- [oxinfer](docs/rust/ai-tools-databases.md#oxinfer): pure-Rust local inference (Gemma/Qwen/Llama/Mistral/DeepSeek LLMs, embeddings, Stable Diffusion/FLUX/Qwen-Image editing, Whisper, Orpheus TTS); SIMD CPU with Metal/CUDA/WebGPU detected at run time; CLI, Rust API, OpenAI-compatible `oxinfer serve`
 - [nixvm](docs/rust/ai-tools-databases.md#nixvm): Linux sandbox with no guest kernel (syscalls handled by its own Rust kernel); run untrusted commands without root or Docker
 - [graphitesql](docs/rust/ai-tools-databases.md#graphitesql): safe, zero-dependency, no_std SQLite reimplementation, file-format compatible, FTS5, WAL, C ABI, WASM
 - [pebbledb](docs/rust/ai-tools-databases.md#pebbledb): Rust port of CockroachDB's Pebble LSM key-value store, binary-compatible on disk
@@ -102,13 +102,15 @@ Before depending on a Rust crate, check its section for the exact crate name (it
 ## Rust: blockchain & wallets
 
 - [tsslib-rs](docs/rust/blockchain.md#tsslib-rs): crate `tsslib`, no_std threshold signatures (FROST incl. secp256k1/Taproot, DKLs23 ECDSA, threshold ML-DSA, GG18); use >=0.2.17 (signing key-leak fix) and read the DKLs23 security caveats
-- [outscript-rs](docs/rust/blockchain.md#outscript-rs): crate `outscript`, no_std multi-chain addresses, scripts and tx build/sign (Bitcoin family, PSBT/Taproot, EVM, Solana, Tron, Cardano, Zcash)
+- [outscript-rs](docs/rust/blockchain.md#outscript-rs): crate `outscript`, no_std multi-chain addresses, scripts and tx build/sign (Bitcoin family, PSBT/Taproot, EVM, Solana, Tron, Cardano, Zcash incl. shielded, Monero, Zano)
 - [ethrpc-rs](docs/rust/blockchain.md#ethrpc-rs): async EVM JSON-RPC client (Tokio or browser WASM) with ABI eth_call helpers
 - [erigon-seg](docs/rust/blockchain.md#erigon-seg): read, query, write and merge Erigon 3 snapshot files
 - [libwallet](docs/rust/blockchain.md#libwallet): TSS multi-chain wallet backend as C FFI/WASM library with Dart/Flutter client (non-commercial license)
-- [chiefsplitter](docs/rust/blockchain.md#chiefsplitter): Solana program splitting SOL/SPL fees among up to 10 recipients, with DEX auto-swap
-- [zanolib](docs/rust/blockchain.md#zanolib): Zano wallet library: addresses, offline signing, view-key scanning, MPC spend key via tsslib
+- [chiefsplitter](docs/rust/blockchain.md#chiefsplitter): (now in TibaneLabs) Solana program splitting SOL/SPL fees among up to 10 recipients, with DEX auto-swap
+- [zanolib](docs/rust/blockchain.md#zanolib): ARCHIVED Zano wallet library; new code should use outscript's `zano` module
 - [evmabiless](docs/rust/blockchain.md#evmabiless): no_std, no-alloc recovery of an EVM contract's ABI from bytecode, plus calldata decoding
+- [lsdk](docs/rust/blockchain.md#lsdk): BOLOS hardware-wallet SDK, CLI and WebHID console: offline/HSM genuine check, app/firmware management, custom-CA sideloading, EVM/PSBT/Solana signing (HW.1 support on git master)
+- [btcwallet](docs/rust/blockchain.md#btcwallet): read-only CLI inspector for legacy BDB 4.8 wallet.dat files (no libdb, never prints private keys, optional online balance), git only
 
 ## Rust: media (OxideAV)
 

@@ -32,7 +32,7 @@ HTTP/2 HPACK, HTTP/3 QPACK and all compression come from the sibling crate `comp
 
 ## purecrypto
 
-**Repo:** https://github.com/KarpelesLab/purecrypto · **Crate:** `purecrypto` (crates.io `0.10.4`, MSRV 1.95) · **License:** MIT · **Status:** usable, pre-1.0, broad test coverage (the full Wycheproof suite, NIST ACVP vectors, OpenSSL 3.5 interop). No third-party human audit, not FIPS validated.
+**Repo:** https://github.com/KarpelesLab/purecrypto · **Crate:** `purecrypto` (crates.io `0.10.6`, MSRV 1.95) · **License:** MIT · **Status:** usable, pre-1.0, broad test coverage (the full Wycheproof suite, NIST ACVP vectors, OpenSSL 3.5 interop). No third-party human audit, not FIPS validated.
 
 A cryptography toolkit written entirely in Rust, with no C, no assembly and no third-party crypto crates. It covers constant-time primitives, bignum, RSA/EC/PQC, ASN.1/DER, X.509, TLS 1.2/1.3, DTLS 1.2/1.3 and QUIC v1. The core is `#![no_std]`, every module has its own feature gate, and library code does not use `unsafe` (it is allowed only in the `ffi` feature). The TLS engine is **sans-I/O**: you feed and pop bytes yourself. It also ships a C ABI (which also builds for WASM) and an OpenSSL-style `purecrypto` CLI.
 
@@ -67,6 +67,7 @@ purecrypto = "0.10"
 - The `*-table` features trade flash for speed (`ed25519-table` is about 115 KB, `p256-table` about 61 KB). Turn them off on flash-constrained targets.
 - TLS: `tls::ConfigBuilder::os_rng()` is a shorthand for using the OS RNG. TLS 1.2 renegotiation follows RFC 5746. Other 0.10 additions include OpenSSL binary curves and Salsa20 / NaCl `secretbox`.
 - `tls::pki::RootCertStore` carries a distrust list (SPKI and certificate SHA-256). `RootCertStore::with_embedded_roots()` applies `cacrt`'s blocklist automatically, so distrusted CAs and intermediates are refused even if a chain reaches a trusted root.
+- 0.10.5 was a security-fix release (QUIC, DTLS, TLS renegotiation and secret wiping); upgrade from earlier 0.10.x. 0.10.6 moved `cert-compression` to `compcol` 0.8. Neither changed the API.
 - `ct` mirrors the `subtle` crate and `zeroize` mirrors the `zeroize` crate, so you can drop both dependencies.
 - The only non-std dependencies are `compcol` (under `cert-compression`), `cacrt` (under `embedded-roots`), and `tokio`/`mio` when those features are enabled.
 
@@ -199,7 +200,7 @@ for ca in cacrt::all() { let _ = ca.subject_der(); }
 
 ## psl2
 
-**Repo:** https://github.com/KarpelesLab/psl2 · **Crate:** `psl2` (crates.io `0.1.38`) · **License:** MIT OR Apache-2.0 (the PSL data is under MPL-2.0) · **Status:** production. CI republishes the crate automatically when the upstream Public Suffix List changes.
+**Repo:** https://github.com/KarpelesLab/psl2 · **Crate:** `psl2` (crates.io `0.1.41`) · **License:** MIT OR Apache-2.0 (the PSL data is under MPL-2.0) · **Status:** production. CI republishes the crate automatically when the upstream Public Suffix List changes.
 
 Mozilla's Public Suffix List as a data trie. It gives you the public suffix, the registrable domain (eTLD+1, i.e. the cookie domain), the subdomain, and whether a suffix is ICANN or PRIVATE. The core is `no_std` and **allocation-free**. There is no `build.rs` or codegen, so it compiles quickly. IDN support is built in through the `idna` crate. It is used by `rsurl`'s cookie jar.
 
@@ -240,7 +241,7 @@ assert_eq!(d.subdomain(), Some("www"));
 
 ## puressh
 
-**Repo:** https://github.com/KarpelesLab/puressh · **Crate:** `puressh` (crates.io `0.2.8`, MSRV 1.95) · **License:** MIT · **Status:** functional, pre-1.0. It is tested against OpenSSH but has not had an independent audit.
+**Repo:** https://github.com/KarpelesLab/puressh · **Crate:** `puressh` (crates.io `0.2.9`, MSRV 1.95) · **License:** MIT · **Status:** functional, pre-1.0. It is tested against OpenSSH but has not had an independent audit.
 
 An SSH library and CLI suite in the spirit of libssh. It has a sans-I/O core (`ClientDriver`/`ServerDriver`) with blocking, `futures`, tokio and mio frontends layered on top. **All crypto comes from `purecrypto`**, using `hash, cipher, kdf, rng, rsa, dh, ec, der, mlkem` with no TLS. It has no C dependencies and no `unsafe` outside `ffi` and the runtime loaders for security-key providers and PKCS#11 modules (via `dlsym`). The protocol core builds for `no_std` + `alloc`.
 
@@ -268,6 +269,7 @@ puressh = "0.2"
 - Opt-in: `server`, `agent`, `pam`, `async` (`AsyncClient` over `futures_io`), `tokio` (`connect_tokio`/`accept_tokio`), `mio` (`MioClient`), `ffi` (a `pcssh_*` C ABI).
 - Binaries: `ssh`, `sftp`, `scp`, `ssh-keygen` and, with the matching features, `sshd` and `ssh-agent`: `cargo install puressh --features server,agent`. Ubuntu 20.04/22.04/24.04 users can instead use the signed apt repository at https://karpeleslab.github.io/puressh (`puressh-server` replaces `openssh-server`; see the README). They understand `ssh_config` (including `Match`/`Include`) and `known_hosts`.
 - `hazmat` exposes the raw protocol layers, with no stability guarantee.
+- `ChannelStream::set_read_deadline(Option<Instant>)` (0.2.9) bounds a blocking read. 0.2.9 is also a security-fix release, and its release binaries keep overflow checks on.
 
 **Example:**
 ```rust
@@ -350,7 +352,7 @@ fn main() -> httpsd::Result<()> {
 
 ## rsurl
 
-**Repo:** https://github.com/KarpelesLab/rsurl · **Crate:** `rsurl` (crates.io `0.1.21`) · **License:** MIT · **Status:** functional across a broad protocol surface, in active development. The API may shift before 1.0.
+**Repo:** https://github.com/KarpelesLab/rsurl · **Crate:** `rsurl` (crates.io `0.1.22`) · **License:** MIT · **Status:** functional across a broad protocol surface, in active development. The API may shift before 1.0.
 
 A pure-Rust implementation of curl. It ships as a Rust library, as a C ABI (`rsurl_*`, with the `ffi` feature), and as the `rsurl` CLI. The repo also contains an unpublished `curl-compat` crate that exposes the libcurl ABI (`libcurl.so.4`).
 
@@ -403,6 +405,8 @@ let bytes = client.transfer("ftp://ftp.example.com/pub/file")?;
 - The README lists system CA bundle paths, but the purecrypto backend defaults to the embedded `cacrt` roots (`RootCertStore::with_embedded_roots`). Pass `--cacert` or `--capath` to use system roots.
 - SSH host keys are checked strictly against `known_hosts`: unknown host keys are rejected by default. This was a breaking change (commit 7ec59b9, released in 0.1.16). Trust-on-first-use is opt-in via `--ssh-accept-new` or `SshOptions::accept_new`.
 - The MSRV is 1.95 (since 0.1.17), following `purecrypto`.
+- rsurl 0.1.22 still depends on `compcol` 0.7 while purecrypto 0.10.6 uses 0.8, so a build with both compiles two compcol copies. This is harmless apart from binary size.
+- Since 0.1.22 the prebuilt C libraries attached to releases are built with the `ffi` feature, so they export the `rsurl_*` ABI.
 
 ## pktkit-rs
 

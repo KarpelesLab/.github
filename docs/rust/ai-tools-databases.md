@@ -191,7 +191,7 @@ conn.wait().await?;
 
 ## oxinfer
 
-**Repo:** https://github.com/KarpelesLab/oxinfer · **Crate:** `oxinfer` library + `oxinfer` CLI (crates.io `0.0.7`, 2026-11-02; master moves daily) · **License:** MIT (model weights keep their own licenses) · **MSRV:** 1.95 · **Status:** large and very active, 0.0.x: the API and the pre-quantized file format may still change. Live browser demo: https://karpeleslab.github.io/oxinfer/
+**Repo:** https://github.com/KarpelesLab/oxinfer · **Crate:** `oxinfer` library + `oxinfer` CLI (crates.io `0.0.8`; master moves daily) · **License:** MIT (model weights keep their own licenses) · **MSRV:** 1.95 · **Status:** large and very active, 0.0.x: the API and the pre-quantized file format may still change. Live browser demo: https://karpeleslab.github.io/oxinfer/
 
 Local inference in pure Rust with no BLAS and no ML framework. Weights are read straight from HuggingFace safetensors, MLX 4-bit, GGUF or `torch.save` (`pytorch_model.bin`) files, and every operation is implemented in the crate with hand-written SIMD (NEON, AVX2, wasm simd128). The CPU path runs everywhere; GPUs (Metal, CUDA, Vulkan detection, WebGPU in the browser) and the Apple Neural Engine (Core ML) are loaded at run time through [`dlsym`](https://github.com/KarpelesLab/dlsym), so one binary works with or without them. Models larger than RAM can be streamed from storage. Output is checked against the `transformers`/`diffusers`/`sentence-transformers` references (per-model agreement numbers are in the README).
 
@@ -225,7 +225,7 @@ oxinfer --model unsloth/orpheus-3b-0.1-ft --speak "Hello there." --voice leo -o 
 - `--model` takes a local directory or file, a HuggingFace repo id (fetched on first use into `~/.cache/oxinfer/hub`, or `$OXINFER_CACHE` / `--cache-dir`), or `org/name:QUANT` for a GGUF repo. Repo ids are looked up on the ATOnline mirror first, then huggingface.co (`OXINFER_HUB=mirror|hf` pins one; `HF_TOKEN` is only sent to huggingface.co). `--download-only` just fetches.
 - Useful flags: `--quant q8|q4` (quantize at load), `--device auto|cpu|metal|cuda|vulkan`, `--mmap`, `--threads N`, `--max-tokens N`, `--temp/--top-k/--top-p/--seed` (default greedy), `--think`, `--tools` (built-in `get_current_datetime` and `calculate`), `--image/--video/--audio` inputs.
 
-**OpenAI-compatible server** (`oxinfer serve`, on httpsd; **master only**: the `server` feature and subcommand are not in crates.io 0.0.7, so install from git for it):
+**OpenAI-compatible server** (`oxinfer serve`, on httpsd; in releases since 0.0.8, where the `server` feature is on by default):
 ```sh
 oxinfer serve --listen 127.0.0.1:8080 --api-key "$KEY" \
   --model qwen=Qwen/Qwen3.5-0.8B,quant=q8 \
@@ -238,10 +238,10 @@ curl -s localhost:8080/v1/chat/completions -H "Authorization: Bearer $KEY" -H 'C
 - Only the models listed with `--model` (`[ID=]SOURCE[,KEY=VALUE...]`) can be requested. Endpoints: `/v1/models`, `/v1/chat/completions` (streaming, tools, images/video/audio parts, thinking), `/v1/completions`, `/v1/embeddings`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/transcriptions` and `/translations`, `/v1/audio/speech`.
 - Models load on first request (`--preload` to load at start); least recently used idle models are unloaded to stay within `--memory-gb` (default 80% of RAM). Each model serves one request at a time. `--api-key` (or `$OXINFER_API_KEY`), `--cors`, `--tls-cert/--tls-key` or `--self-signed`, `--no-remote-media`, `--local-media` (trusted clients only).
 
-**Library** (`oxinfer::engine`, the CLI's text generation as an API; compiled against 0.0.7 and master with `default-features = false, features = ["hf"]`):
+**Library** (`oxinfer::engine`, the CLI's text generation as an API; compiled against 0.0.8 with `default-features = false, features = ["hf"]`):
 ```toml
 [dependencies]
-oxinfer = { version = "0.0.7", default-features = false, features = ["hf"] }   # add "gpu", "media" as needed
+oxinfer = { version = "0.0.8", default-features = false, features = ["hf"] }   # add "gpu", "media", "server" as needed
 ```
 ```rust
 use oxinfer::engine::{Engine, EngineOptions, Flow};
@@ -260,7 +260,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 Also: `Engine::send_with_media` (images, video, audio in an `Attachments`), `Engine::send_tool_results`, `Engine::cancel_handle()` for cancellation from another thread, `oxinfer::hf::with_progress` for download progress, the lower-level `oxinfer::generate` loops, and a C API (`capi` feature, `include/oxinfer.h`).
 
-**Cargo features:** default `media` (file decoding through OxideAV codecs and containers), `hf` (HuggingFace fetching via rsurl), `gpu` (run-time GPU backends via dlsym) and, on master, `server`. `oxideav` alone exposes the in-memory `oxinfer::av` types (oxideav-core `VideoFrame`/`AudioFrame`) without codecs. `capi` adds the C ABI; `web` is the wasm32 browser build.
+**Cargo features:** default `media` (file decoding through OxideAV codecs and containers), `hf` (HuggingFace fetching via rsurl), `gpu` (run-time GPU backends via dlsym) and `server` (the `oxinfer serve` subcommand; default since 0.0.8). `oxideav` alone exposes the in-memory `oxinfer::av` types (oxideav-core `VideoFrame`/`AudioFrame`) without codecs. `capi` adds the C ABI; `web` is the wasm32 browser build.
 
 **Gotchas:**
 - Weights are large: check the README table for sizes before fetching (`--download-only` to prefetch). By default the whole file is read into RAM at start; `--mmap` starts faster.
@@ -269,9 +269,9 @@ Also: `Engine::send_with_media` (images, video, audio in an `Attachments`), `Eng
 
 ## nixvm
 
-**Repo:** https://github.com/KarpelesLab/nixvm · **Crate:** `nixvm` library + CLI (crates.io `0.0.3`, 2026-10-04. Master has moved well past it, including the PID 1 symlink fix, so prefer git.) · **License:** MIT · **MSRV:** 1.95 · **Status:** experimental but functional. Alpine busybox, `apk` (including over HTTPS with `NIXVM_NET=host`), Node.js and nginx run.
+**Repo:** https://github.com/KarpelesLab/nixvm · **Crate:** `nixvm` library + CLI (crates.io `0.0.5`, 2026-11-12; daemonless OCI image runs are on master only) · **License:** MIT · **MSRV:** 1.95 · **Status:** experimental but functional. Alpine busybox, `apk` (including over HTTPS with `NIXVM_NET=host`), Node.js and nginx run.
 
-A portable sandbox in the style of a VM that runs a **real Linux userland without a guest kernel**, like gVisor. Guest code runs on a software CPU interpreter (aarch64, and a growing x86-64) or on KVM (Linux/x86-64) / Hypervisor.framework (macOS/arm64). Every `syscall`/`svc` traps into nixvm's own Rust "kernel", which implements files, memory, processes, threads, signals and networking in userspace. It needs no root, no Docker and no host namespaces. Inside the guest, namespaces (including unprivileged user namespaces, so bubblewrap runs) and a cgroup v2 hierarchy at `/sys/fs/cgroup` work as on Linux. Supported loaders: static, static-PIE and dynamically linked ELF (real `ld-musl`). The core has zero dependencies and builds for wasm; there is a [live browser demo](https://karpeleslab.github.io/nixvm/). `unsafe` is limited to four documented FFI sites.
+A portable sandbox in the style of a VM that runs a **real Linux userland without a guest kernel**, like gVisor. Guest code runs on a software CPU interpreter (aarch64, and a growing x86-64) or on KVM (Linux/x86-64) / Hypervisor.framework (macOS/arm64; built on every macOS/arm64 target since 0.0.5, with an aarch64 vDSO calibrated from the host timebase). Every `syscall`/`svc` traps into nixvm's own Rust "kernel", which implements files, memory, processes, threads, signals and networking in userspace. It needs no root, no Docker and no host namespaces. Inside the guest, namespaces (including unprivileged user namespaces, so bubblewrap runs) and a cgroup v2 hierarchy at `/sys/fs/cgroup` work as on Linux. Supported loaders: static, static-PIE and dynamically linked ELF (real `ld-musl`). The core has zero dependencies and builds for wasm; there is a [live browser demo](https://karpeleslab.github.io/nixvm/). `unsafe` is limited to four documented FFI sites.
 
 **Use it when:**
 - An agent must run untrusted or messy commands (`npm install`, `pip install`, `./configure`, `apk add`) and should not modify the host root filesystem or reach the network by default.
@@ -323,7 +323,7 @@ fn main() -> Result<(), nixvm::Error> {
 ```
 
 **Gotchas:**
-- **PID 1 (`argv[0]`) must be an absolute path.** There is no `PATH` lookup at that step. In crates.io 0.0.3 it must also be a real ELF file, not a symlink: `-- /bin/sh` fails on Alpine with "ELF file is truncated" because `/bin/sh` links to busybox. Master resolves an absolute PID 1 symlink inside the root (ed08861, 2026-10-05), so install from git or use `/bin/busybox sh -c '...'`. Inside the guest, `PATH` and symlinks work normally.
+- **PID 1 (`argv[0]`) must be an absolute path.** There is no `PATH` lookup at that step. Since 0.0.4 an absolute PID 1 symlink is resolved inside the guest root (ed08861), so `-- /bin/sh` works on Alpine; 0.0.3 and earlier needed a real ELF file such as `/bin/busybox sh -c '...'`. Inside the guest, `PATH` and symlinks work normally.
 - `nixvm shell` is still hardcoded to `run -- /bin/sh` with no `--root` option (`src/bin/nixvm.rs`), so it has no root filesystem and fails; use `nixvm run --root DIR -- /bin/busybox sh` instead.
 - Without `--root`, `/` is an empty tmpfs, so nothing can run unless you use `exec_elf`.
 - `scripts/build-claude-root.sh` builds an Alpine root containing the musl build of Claude Code, to run `claude -p` inside nixvm with `NIXVM_NET=host`.

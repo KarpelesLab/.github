@@ -69,9 +69,9 @@ argus                                              # windowed browser (macOS); h
 
 ## kataan
 
-**Repo:** https://github.com/KarpelesLab/kataan · **Crate:** `kataan` (crates.io `0.0.9`) · **License:** MIT · **Status:** usable (about 99.99% of tc39/Test262 passes; JIT and WASM tiers still being built)
+**Repo:** https://github.com/KarpelesLab/kataan · **Crate:** `kataan` (crates.io `0.0.10`) · **License:** MIT · **Status:** usable (about 99.99% of tc39/Test262 passes; JIT and WASM tiers still being built)
 
-A JavaScript (ECMAScript) engine in pure Rust with a tree-walking interpreter plus a register bytecode VM, ES modules, async/await, generators, Proxy, BigInt, Intl, Temporal, RegExp (in-house), and a `no_std` WebAssembly engine. The language core is sans-I/O and `no_std + alloc`; the host runtime (event loop, timers, console, URL, streams, `node:` compat, `fetch`, WebCrypto) is a separate feature-gated layer. Available as a Rust library, a C library (`kt_eval`), and the `kataan` CLI/REPL. `unsafe_code = "deny"` outside the FFI and a few audited VM primitives. There is a browser playground at https://karpeleslab.github.io/kataan/.
+A JavaScript (ECMAScript) engine in pure Rust running on a register bytecode VM (the original tree-walker is retired), ES modules, async/await, generators, Proxy, BigInt, Intl, Temporal, RegExp (in-house), and a `no_std` WebAssembly engine. The language core is sans-I/O and `no_std + alloc`; the host runtime (event loop, timers, console, URL, streams, `node:` compat, `fetch`, WebCrypto) is a separate feature-gated layer. Available as a Rust library, a C library (`kt_eval`), and the `kataan` CLI/REPL. `unsafe_code = "deny"` outside the FFI and a few audited VM primitives. There is a browser playground at https://karpeleslab.github.io/kataan/.
 
 **Use it when:** you need to run untrusted or user-supplied JS inside a Rust program, expose Rust functions to scripts, or evaluate JS in a sandbox with no network or filesystem by default.
 **Don't use it when / limits:** you need V8-level performance on hot object code (JIT is x86-64/Linux only and covers numeric paths). No DOM (see `argus`). `Interp` is `!Send` (it holds `Rc`s).
@@ -79,12 +79,12 @@ A JavaScript (ECMAScript) engine in pure Rust with a tree-walking interpreter pl
 **Add it:**
 ```toml
 [dependencies]
-kataan = "0.0.9"
+kataan = "0.0.10"
 # no_std language core only:
-# kataan = { version = "0.0.9", default-features = false, features = ["alloc"] }
+# kataan = { version = "0.0.10", default-features = false, features = ["alloc"] }
 ```
 
-**Cargo features:** default (crates.io 0.0.9) = `std, regex, intl, intl-tz-names, module, host, cli, crypto`; on master the default also includes `jit` (x86-64 Linux only, inert elsewhere) and `pool-alloc` (the pure-Rust pooling allocator the CLI installs). Optional: `fetch` (fetch/Node http over `rsurl`), `jit` (in 0.0.9), `ffi` (C ABI; build with `cargo rustc --lib --release --features ffi --crate-type cdylib`, header `include/kataan.h`). Library users can drop `cli`.
+**Cargo features:** default = `std, regex, intl, intl-tz-names, module, host, cli, crypto, jit, pool-alloc` (`jit` is x86-64 Linux only and inert elsewhere; `pool-alloc` is the pure-Rust pooling allocator the CLI installs). Optional: `fetch` (reserved: no implementation exists, and master dropped the unused `rsurl` dependency), `ffi` (C ABI; build with `cargo rustc --lib --release --features ffi --crate-type cdylib`, header `include/kataan.h`). Library users can drop `cli`.
 
 **CLI:**
 ```sh
@@ -100,7 +100,6 @@ kataan lex|parse|disasm -e '...'   ;   kataan repl
 use kataan::parser::Parser;
 use kataan::{Ctx, Interp};
 
-// The program must outlive the interpreter (Interp<'a> borrows the AST).
 let program = Parser::parse_program("hypot(3, 4) + 1").unwrap();
 let mut interp = Interp::new();
 interp.register_global_fn("hypot", 2, |cx: &mut Ctx, _this, args| {
@@ -120,7 +119,8 @@ let (console, value) = kataan::nbvm::execute("console.log('hi'); 6 * 7").unwrap(
 
 **Gotchas:**
 - `interp.display(value)` and `interp.realm().to_display_string(value)` both stringify a value (the README uses the latter).
-- crates.io `0.0.9` (2026-09-05) lags master by roughly 470 commits (as of 2026-11-07). On master `Interp::run` executes on the register bytecode VM (`nbvm`), the JIT is a default feature and has deopt exits. The example above compiles against both. Use a git dependency for current behaviour.
+- The README feature table still marks `jit` as non-default and omits `pool-alloc`; `Cargo.toml` is authoritative.
+- The default `crypto` feature depends on `purecrypto` 0.6 (0.0.10 and master), so a build that also uses purecrypto 0.10 compiles two copies. Disable `crypto` if you don't need WebCrypto.
 - `Ctx` also has `new_object`, `set`, `get`, `call`, `construct`, `new_array`, `type_error`, `set_native_state`/`native_state`, `deferred` (promises). Install host globals with `kataan::host::install_all(&mut interp)`, then call `kataan::host::timers::run_event_loop`.
 - Resource caps are set in `kataan::Limits` (`Interp::new_with_limits`, `nbvm::execute_with_limits`). There is no JS step budget. Stop runaway scripts with the `kataan::interrupt` watchdog (`nbvm::execute_typed_interruptible`).
 
@@ -227,7 +227,7 @@ Also: `Repository::open`, `read_object`, `head_id`, `refs()`, `index()`, `create
 
 ## fstool
 
-**Repo:** https://github.com/KarpelesLab/fstool · **Crate:** `fstool` (crates.io `0.5.2`) · **License:** MIT · **Status:** production-ready for most formats (outputs are cross-validated against `e2fsck`, `fsck.vfat`, `xfs_repair`, `qemu-img`, `cryptsetup`, `sgdisk`). MSRV 1.95
+**Repo:** https://github.com/KarpelesLab/fstool · **Crate:** `fstool` (crates.io `0.5.4`) · **License:** MIT · **Status:** production-ready for most formats (outputs are cross-validated against `e2fsck`, `fsck.vfat`, `xfs_repair`, `qemu-img`, `cryptsetup`, `sgdisk`). MSRV 1.95
 
 Build, inspect, modify, and convert disk images and filesystem images entirely in userspace, **without root, loop devices, or mounts**. Read/write support: ext2/3/4, FAT12/16/32, exFAT, XFS, NTFS, HFS+, HFS, APFS (partial), F2FS, AFFS, littlefs, SquashFS, cramfs, ISO 9660, UDF, GRF, tar, zip (including encryption and split volumes), cpio, ar. Read-only: cab, 7z, rar5, lha, arc, sit, lzx. Partition tables: MBR, GPT, Apple Partition Map (read). Containers: qcow2 (read/write, compression, backing files, encryption), LUKS1/2 (read/write/create), DMG (read; writes UDRO/UDCO/UDZO/UDBZ/ULMO/ULFO and encrypted `encrcdsa` v2), `.sparseimage`/`.sparsebundle` (read/write/create). All dependencies are pure Rust (`compcol`, `purecrypto`). There is also a browser app at https://karpeleslab.github.io/fstool/.
 
@@ -277,7 +277,7 @@ Option structs and enums are `#[non_exhaustive]` since 0.5.1, so construct them 
 
 ## cadlab
 
-**Repo:** https://github.com/KarpelesLab/cadlab · **Crate:** `cadlab` (crates.io `0.0.2`; library plus `cadlab` binary) · **License:** MIT · **Status:** pre-alpha by version number, but broad in practice. Roadmap milestones M0–M5, M8 and M9 are done, and most of M6/M7. The README "Status" paragraph is stale: it says only `project.*` exists, but there are about 169 commands. MSRV 1.95.
+**Repo:** https://github.com/KarpelesLab/cadlab · **Crate:** `cadlab` (crates.io `0.0.3`; library plus `cadlab` binary) · **License:** MIT · **Status:** pre-alpha by version number, but broad in practice. Roadmap milestones M0–M5, M8 and M9 are done, and most of M6/M7. The README "Status" paragraph is stale: it says only `project.*` exists, but there are about 169 commands. MSRV 1.95.
 
 Headless electronics CAD (EDA), built to be **driven by programs and AI agents**. It covers parts and BOM, circuit (netlist-first), ERC, auto-generated schematic, board, placement, autorouting, DRC, and fab outputs, with no GUI. The only visual output is rendering (PNG/SVG, isometric 3D). Every operation is a typed, JSON-Schema-described command in one **command registry**. The Rust library, the CLI and the MCP server are thin layers over that registry, so names, arguments, validation and errors are identical on all three. Coordinates are integer nanometres, and output is deterministic byte for byte (the router is seeded). Polygon geometry comes from [`polyclip`](i18n-math.md#polyclip). The code is clean-room: KiCad and freerouting are used only as external test oracles, never as code sources.
 
@@ -289,7 +289,7 @@ Headless electronics CAD (EDA), built to be **driven by programs and AI agents**
 
 **Install / run:**
 ```sh
-cargo install cadlab            # or prebuilt binaries: GitHub release v0.0.2 (linux x86_64/aarch64, macOS universal, Windows)
+cargo install cadlab            # or prebuilt binaries: GitHub release v0.0.3 (linux x86_64/aarch64, macOS universal, Windows)
 claude mcp add cadlab -- cadlab mcp      # register as an MCP server (stdio)
 ```
 
@@ -331,8 +331,8 @@ These generic entry points work on every command:
 - Board: `board` (`setup`, `outline`, `rules`, `stackup`, `hole`, `cutout`, `import_kicad`, `export_kicad`), `place` (`auto`, `near`, `align`, ...), `track`, `via`, `zone`, `keepout`, `impedance` (`calc`, and `solve` to fit a net class's width to a target impedance), `current`.
 - Routing and checks: `route` (`all`, `nets`, `fanout`, `diffpair`, `tune`, `import_ses`), `drc`.
 - Output: `render` (`schematic`, `board`, `board3d`, `footprint`, `symbol`), `schematic` (`export` to `.kicad_sch`).
-- Export: `export` (`gerber`, `drill`, `pnp`, `ipc356`, `ipc2581`, `step`, `idf`, `idx`, `dsn`, `spice`, `all`; master adds `openems`).
-- Simulation (master only, after the 0.0.2 release): `sim sparams` runs cadlab's built-in FDTD full-wave solver over a board region (stack, copper, vias, lumped ports, CPML) and writes a Touchstone file. `export openems` writes the same region as an openEMS model, which [`ems`](#ems) can run.
+- Export: `export` (`gerber`, `drill`, `pnp`, `ipc356`, `ipc2581`, `step`, `idf`, `idx`, `dsn`, `spice`, `all`, `openems`).
+- Simulation (since 0.0.3): `sim sparams` runs cadlab's built-in FDTD full-wave solver over a board region (stack, copper, vias, lumped ports, CPML) and writes a Touchstone file. `export openems` writes the same region as an openEMS model, which [`ems`](#ems) can run.
 - Fab: `fab` (`list`, `check`, `compare`, `export`, `substitute`).
 - Built-in fab profiles: jlcpcb, pcbway, oshpark, aisler, eurocircuits, seeed, nextpcb, pcbgogo, allpcb, elecrow, generic. You can add your own in `~/.config/cadlab/fab-profiles`.
 
@@ -345,7 +345,7 @@ These generic entry points work on every command:
 **Library:**
 ```toml
 [dependencies]
-cadlab = { version = "0.0.2", default-features = false }   # drop CLI/network/PNG/rayon/3D-model deps
+cadlab = { version = "0.0.3", default-features = false }   # drop CLI/network/PNG/rayon/3D-model deps
 serde_json = "1"
 ```
 ```rust
@@ -373,19 +373,19 @@ for (cmd, args) in [
 s.save()?;
 ```
 
-**Cargo features:** the defaults are `cli` (clap and rpassword, needed for the binary), `net` (ureq for the DigiKey, Mouser and Nexar supplier APIs), `png` (tiny-skia; SVG needs no feature), `parallel` (rayon plus `polyclip/rayon`) and `models3d` (STL/OBJ/glTF/USDZ import through `oxideav-mesh3d`; master adds STEP and VRML).
+**Cargo features:** the defaults are `cli` (clap and rpassword, needed for the binary), `net` (ureq for the DigiKey, Mouser and Nexar supplier APIs), `png` (tiny-skia; SVG needs no feature), `parallel` (rayon plus `polyclip/rayon`) and `models3d` (STL/OBJ/glTF/USDZ/STEP/VRML import through `oxideav-mesh3d`).
 
 **Gotchas:**
 - `docs/INTERFACES.md` shows the *target* CLI, and some of its examples do not run. `cadlab erc` is really `cadlab circuit erc`, `board outline rect 50mm 30mm` is `board outline --width 50mm --height 30mm`, and `route --all` is `route all`. The `p.bom().add(..)` wrapper API in that file does not exist yet; use `run` or `Registry::execute`. Trust `cadlab describe`.
 - Part IDs in the library use underscores (`LED_red_0603`). Mistyped names fail with a hint such as ``did you mean `LED_red_0603`?``.
 - Supplier research (`part.search`, `bom.resolve/check/cost`, `fab check --parts`) needs providers. Configure them with `cadlab config digikey|mouser|nexar`, with environment variables (`DIGIKEY_CLIENT_ID`/`_SECRET`, `MOUSER_API_KEY`, `NEXAR_CLIENT_ID`/`_SECRET`), or with offline JSON catalogs (`CADLAB_CATALOGS`, `~/.config/cadlab/catalogs/*.json`, `catalog.import` for a JLCPCB/LCSC CSV). `CADLAB_OFFLINE=1` serves only cached answers. Credentials are never stored in the project.
 - A project is a git-friendly directory: `cadlab.toml`, `circuit.json`, `board.json`, `bom.json` and `library/`. `.cadlab/` holds caches and undo history, and `out/` holds generated files. Fab-specific choices go only in `out/fab/<fab>/fab-lock.json`.
-- crates.io cadlab 0.0.2 requires `polyclip ^0.0.4` (an exact pin under 0.0.x rules) while master uses 0.0.6, so a project that also depends on polyclip directly gets two copies unless the versions match.
+- cadlab 0.0.3 depends on `polyclip ^0.0.6` (an exact pin under 0.0.x rules). A project that also uses polyclip directly should use the same version, or it gets two copies.
 - `sim.sparams` uses cadlab's own FDTD engine, not `ems`; the two share the openEMS model description, not code.
 
 ## ems
 
-**Repo:** https://github.com/KarpelesLab/ems · **Crate:** `ems` (crates.io `0.0.5`; library plus the `ems`, `ems-nf2ff` and `ems-sar-calc` binaries) · **License:** MIT · **Status:** early development (milestones 1–4 done; parity with openEMS checked against a black-box openEMS; API still changing). MSRV 1.95
+**Repo:** https://github.com/KarpelesLab/ems · **Crate:** `ems` (crates.io `0.0.6`; library plus the `ems`, `ems-nf2ff` and `ems-sar-calc` binaries) · **License:** MIT · **Status:** early development (milestones 1–4 done; parity with openEMS checked against a black-box openEMS; API still changing). MSRV 1.95
 
 A clean-room FDTD (finite-difference time-domain) electromagnetic field solver, written as a replacement for [openEMS](https://openems.de). Models come from its companion crate [`csx`](#csx); `ems` adds mesh compilation, time stepping, boundaries (PEC/PMC, Mur, CPML, periodic/Bloch), sources and plane waves, lumped elements, probes, ports (lumped, microstrip, CPW, stripline, coax, rectangular/circular waveguide) with S-parameters and Z_in, field dumps, NF2FF far fields and SAR. Cartesian and cylindrical grids are supported. The `ems` binary takes openEMS's command line, so scripts that call `openEMS` (including its Python and Octave wrappers) can call `ems` instead. `unsafe` is forbidden. The README reports 1.5–10x openEMS's speed on vacuum/PML boxes and results within 1e-7…1e-3 of openEMS on its end-to-end fixtures.
 
@@ -395,7 +395,7 @@ A clean-room FDTD (finite-difference time-domain) electromagnetic field solver, 
 **Add it:**
 ```toml
 [dependencies]
-ems = "0.0.5"     # default feature `xml` runs openEMS XML files
+ems = "0.0.6"     # default feature `xml` runs openEMS XML files
 csx = "0.0.2"     # must be the same csx version ems uses, or the model types won't match
 ```
 
@@ -440,7 +440,7 @@ Run an openEMS XML file from Rust with `Simulation::from_xml`, or `cargo run --r
 
 **Gotchas:**
 - Build and run with `--release`, as the README's commands do.
-- Pin `csx` to the version `ems` depends on (`0.0.2` for ems 0.0.5). A git `csx` next to a crates.io `ems` gives two incompatible `ContinuousStructure` types.
+- Pin `csx` to the version `ems` depends on (`0.0.2` for ems 0.0.6). A git `csx` next to a crates.io `ems` gives two incompatible `ContinuousStructure` types.
 - [`cadlab`](#cadlab)'s `sim sparams` has its own FDTD engine; `export openems` is how a cadlab board region reaches `ems`.
 
 ## csx
@@ -478,19 +478,22 @@ Repo examples: `info` (summarise a file), `patch_antenna` (build and mesh a para
 
 ## guide
 
-**Repo:** https://github.com/KarpelesLab/guide · **Crate:** `guide` (git only; crates.io `0.0.0` is the empty scaffold) · **License:** MIT · **Status:** pre-alpha. Roadmap milestones M0–M2 and M4 are done, M3 (FPGA routing) is largely in; PCB routing (M5) and placement (M7+) are not started. MSRV 1.95
+**Repo:** https://github.com/KarpelesLab/guide · **Crate:** `guide` (crates.io `0.0.1`: core engine, `fpga`, `pcb` geometry/DRC, `kicad` clearance checks; PCB routing and placement, `dsn`, `mapf`, `asic` and the CLI are git only) · **License:** MIT · **Status:** pre-alpha; the API changes between 0.0.x releases. On master, routing and placement work for FPGAs and PCBs (benchmarked against VPR, KiCad and Freerouting). MSRV 1.95
 
 A placement and routing engine meant to be shared across every problem that reduces to connecting terminals through contended resources: PCBs, FPGAs, ASIC global routing, multi-agent path finding. Today it has the core model (nets, terminals, a `RoutingSpace` abstraction with grid and explicit-graph spaces), Dijkstra/A* with reusable search state, Steiner trees, a negotiated-congestion (PathFinder) multi-net engine with rip-up and reroute, deterministic parallel routing, budgets and cancellation, partial results with failure reports, and an independent validator that shares no code with the router. The `fpga` feature imports VTR routing-resource graphs, architectures and placed designs, with static timing analysis and timing-driven routing. The `pcb` feature adds a geometry layer over [`polyclip`](i18n-math.md#polyclip) (clearances, spatial index, design rules, DRC), and `kicad` reads KiCad boards for clearance checks, agreeing with KiCad 10's DRC on 3448 of its 3450 findings on the curated boards. `unsafe` is forbidden; results are identical across thread counts and platforms.
 
 **Use it when:** you need a deterministic multi-net router over a grid or graph you define, VTR-style FPGA routing, or an exact PCB clearance check against KiCad boards.
-**Don't use it when / limits:** you need PCB routing or placement (not implemented; [`cadlab`](#cadlab) has a working PCB autorouter today), a CLI (planned for 1.0), or a stable API.
+**Don't use it when / limits:** you need a stable API, or you need PCB routing, placement or the CLI from a crates.io release (0.0.1 has neither; use git, or [`cadlab`](#cadlab)'s autorouter).
+
+**On master (git):** features `pcb` (adds PCB routing, zone filling and placement), `kicad` (writes routes, fills and placements back), `dsn` (Specctra DSN import / SES export, a Freerouting replacement), `mapf` (multi-agent path finding, MovingAI benchmarks), `asic` (ISPD 2007/2008 global routing and scoring), and `cli`. The `guide` CLI (`cargo install --git https://github.com/KarpelesLab/guide guide --features cli`) runs `guide <domain> <action>`: `pcb route|place|flow|drc`, `dsn route`, `fpga route|place|flow`, `mapf solve`, `asic route|score`. Every command takes `--json FILE` for a machine-readable report, plus `--seed`, `-j`, `--time-limit`; exit status 0 = complete and legal, 1 = incomplete or illegal, 2 = bad input.
 
 **Add it:**
 ```toml
 [dependencies]
-guide = { git = "https://github.com/KarpelesLab/guide" }                          # core engine
-# guide = { git = "https://github.com/KarpelesLab/guide", features = ["fpga"] }   # VTR import + timing
-# guide = { git = "https://github.com/KarpelesLab/guide", features = ["kicad"] }  # geometry + KiCad boards (implies pcb)
+guide = "0.0.1"                                       # core engine
+# guide = { version = "0.0.1", features = ["fpga"] }  # VTR import + timing
+# guide = { version = "0.0.1", features = ["kicad"] } # geometry + KiCad clearance checks (implies pcb)
+# guide = { git = "https://github.com/KarpelesLab/guide", features = ["kicad"] }  # + PCB routing/placement (master)
 ```
 
 **Example (two nets negotiating around a wall on a 2-layer grid; verified to compile and run):**
@@ -513,7 +516,8 @@ assert!(outcome.is_success());                              // also: outcome.rou
 `route_parallel`, `route_timed` and `route_timed_parallel` are the threaded and timing-driven variants; `guide::validate::check(space, nets, &outcome.routes)` re-checks a result independently. `Grid::builder(w, h, layers)` sets connectivity and orthogonal/diagonal/via costs.
 
 **Gotchas:**
-- The crates.io release is the M0 scaffold and its README still says "empty scaffold"; depend on git.
+- The README shipped with crates.io 0.0.1 still says "Version 0.0.0 is an empty scaffold", but 0.0.1 contains the engine.
+- Master has breaking changes since 0.0.1: `pcb::Options` was renamed `pcb::RouteOptions` (ac85154), and `engine::Outcome` is `#[non_exhaustive]`. The example above compiles against both.
 
 ## nanami
 

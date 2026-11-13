@@ -28,7 +28,7 @@ Pure-Rust codecs and format libraries with little or no dependency baggage. For 
 
 ## compcol
 
-**Repo:** https://github.com/KarpelesLab/compcol · **Crate:** `compcol` (crates.io `0.7.8`) · **License:** MIT · **Status:** usable (566+ tests, cross-validated against reference tools; fuzz targets)
+**Repo:** https://github.com/KarpelesLab/compcol · **Crate:** `compcol` (crates.io `0.8.0`) · **License:** MIT · **Status:** usable (1,700+ tests, cross-validated against reference tools; fuzz targets)
 
 A collection of compression algorithms in pure Rust behind one caller-buffered streaming trait (`Encoder`/`Decoder`/`Algorithm`). It is `#![no_std]` and `#![forbid(unsafe_code)]`, has zero runtime dependencies (tokio only with the `tokio` feature), and gates each algorithm behind its own cargo feature. MSRV 1.95, edition 2024.
 
@@ -38,17 +38,18 @@ A collection of compression algorithms in pure Rust behind one caller-buffered s
 **Add it:**
 ```toml
 [dependencies]
-compcol = "0.7"                                        # default: alloc, rle, deflate, zlib, gzip, factory
-# compcol = { version = "0.7", features = ["std", "zstd", "brotli", "xz"] }
-# compcol = { version = "0.7", features = ["all"] }    # every algorithm
-# firmware, no heap: compcol = { version = "0.7", default-features = false, features = ["embed", "gzip"] }
+compcol = "0.8"                                        # default: alloc, rle, deflate, zlib, gzip, factory
+# compcol = { version = "0.8", features = ["std", "zstd", "brotli", "xz"] }
+# compcol = { version = "0.8", features = ["all"] }    # every algorithm
+# firmware, no heap: compcol = { version = "0.8", default-features = false, features = ["embed", "gzip"] }
 ```
 
 **Key features / cargo features:**
 - Capability features: `alloc`, `std` (`compcol::io`: `EncoderWriter`, `EncoderReader`, `DecoderWriter`, `DecoderReader`), `tokio` (same four names in `compcol::tokio_io`), `factory` (`encoder_by_name`, `decoder_by_name`, `names`, `extension`, `detect`), `checksum` (public Adler-32/CRC-32).
 - Algorithm features: `deflate`, `deflate64`, `zlib`, `gzip`, `lzma`, `xz`, `lzma2`, `zstd`, `brotli`, `lz4`, `lz5`, `lzf` (liblzf raw format), `snappy`, `lzw`, `lzss`, `bzip2`, `lzo`, `lzx`, `amiga_lzx`, `quantum`, `lzfse`, `adc`, `ppmd`, `xpress`, `xpress_huffman`, `lznt1`, `lzham`, `lzs`, `packbits`, `lha`, `zip_implode`/`zip_shrink`/`zip_reduce`, `arc_*`, `sit13`/`lzah`/`arsenic`, `rar1`-`rar5`, filters `bcj`/`bcj2`/`delta`, primitives `huffman`/`rangecoder`/`mtf`/`bwt`, and `hpack`/`qpack`. The `all` feature enables everything.
 - One-shot helpers in `compcol::vec`: `compress_to_vec`, `decompress_to_vec`, `*_with(config)`, and `decompress_to_vec_capped` (bomb-safe, returns `Error::OutputLimitExceeded`). `compcol::limit::LimitedDecoder` wraps any decoder with a cap.
-- `Decoder::skip(input, n)` advances through decompressed output without emitting it.
+- `Decoder::discard_output(input, n)` advances through decompressed output without emitting it.
+- 0.8: `Decoder::set_output_limit` (`LimitedDecoder` passes its cap down, so buffering decoders such as snappy, huffman and bwt refuse before allocating), `ContiguousDecoder` (lzma, xz, lzma2, zstd decode into one caller buffer that doubles as the history) via `factory::contiguous_decoder_by_name`, streaming rar2/rar3, multi-frame zstd/lz4. CLI feature `mmap` (memmap2, binary only) decodes xz/zstd straight into the output file. 0.7.9 was a security-audit release (hangs, limit bypasses), so stay on 0.7.9+ / 0.8.
 - zlib-level control for the deflate family (0.7.8): levels 0-9 (0 = stored), `deflate::Strategy` (`Default`, `Filtered`, `HuffmanOnly`, `Rle`, `Fixed`), memory level and window bits through `deflate::EncoderConfig` and `Encoder::with_deflate_config`, preset dictionaries (`zlib::Encoder::with_dictionary`; the decoder returns `Error::NeedDictionary` until you call `set_dictionary`), and partial/block flushes.
 - Other recent additions: zstd accepts libzstd's negative "fast" levels and a configurable window limit (0.7.4); xz decodes concatenated streams and Delta/BCJ filter chains and verifies CRC64/SHA-256 checks (0.7.4); the bzip2 encoder output is byte-identical to libbzip2; an LZFSE encoder (0.7.7); and ZIP method 14 (LZMA) and 98 (PPMd variant I) entry codecs (0.7.8).
 - `embed` is a mode, not an algorithm: it rebuilds the deflate family (`gzip`, `zlib`, `deflate`) as heap-free variants under the same paths and traits. It adds one-shot `gzip::decompress`, `gzip::decompressed_len` and `gzip::compress` (caller-provided table), `const`-constructible streaming codecs that can live in a `static` (`gzip::Decoder` with a 32 KiB window, `gzip::WindowedDecoder::<N>`, `gzip::Encoder`, `gzip::BlockEncoder::<B, T>`), and `compcol::embed::flate`, the former `minizlib` API (`gunzip`, `Reader`, `Stream`, `Decompressor`, `Compressor`). CI holds gzip streaming decode to about 4 KB of code and 352 B of stack on Cortex-M4.
@@ -74,8 +75,9 @@ let mut dec = compcol::factory::decoder_by_name("gzip").expect("compiled in");
 
 **Gotchas:**
 - The trait methods return `Result<(Progress, Status), Error>`, a tuple. Loop until `Status::StreamEnd` on `finish()`.
-- The README's install snippets say `version = "0.6"`, but crates.io is at 0.7.8. Use `0.7`.
-- Cargo features unify, so enabling `embed` anywhere in a dependency graph switches every user of compcol in that graph to the small deflate variants (lower ratio, no sync flush, no preset dictionaries). Enable it only in firmware binaries, never in a library. `--all-features` turns it on; `all` does not.
+- The README's install snippets say `version = "0.6"`, but crates.io is at 0.8.0. Use `0.8`.
+- 0.8 added a provided method to `Decoder` (`set_output_limit`); custom `Decoder` implementations keep compiling, but code that matched on 0.7 trait shapes may need updating.
+- Cargo features unify, so enabling `embed` anywhere in a dependency graph switches every user of compcol in that graph to the small deflate variants (lower ratio, no sync flush, no preset dictionaries). Enable it only in firmware binaries, never in a library. `--all-features` turns it on; `all` does not. Note that `outscript` 0.3's default `bbqr` feature enables compcol `embed`, so pulling in outscript with default features switches every compcol 0.8 user in the build (for example purecrypto's `cert-compression`) to the small variants; use `outscript` with `default-features = false` and without `bbqr` if that matters.
 - `EncoderWriter` finishes on `Drop` on a best-effort basis. Call `.finish()` explicitly to see errors.
 - `factory::detect` does not detect brotli or raw `.lzma` (they have no magic bytes). It only reports codecs that were compiled in.
 - `decompress_to_vec` is unbounded. Use the `_capped` variants for untrusted input.
@@ -91,7 +93,7 @@ The tiny `no_std`, no-alloc, no-panic gzip/zlib/deflate codec for firmware. Its 
 **Migrate:**
 ```toml
 [dependencies]
-compcol = { version = "0.7.2", default-features = false, features = ["embed", "gzip"] }
+compcol = { version = "0.8", default-features = false, features = ["embed", "gzip"] }
 ```
 Then replace `use minizlib::*` with `use compcol::embed::flate::*`. Function and type names (`gunzip`, `gzip`, `Buffer`, `Reader`, `Stream`, `Decompressor`, `Compressor`, `Error`) are unchanged.
 
@@ -283,18 +285,18 @@ assert_eq!(&bytes[..], b"\xC7\xD1\xB1\xB9\xBE\xEE ?");
 
 ## anydcode
 
-**Repo:** https://github.com/KarpelesLab/anydcode · **Crate:** `anyd` (crates.io `0.2.0`) · **License:** MIT · **Status:** usable / actively developed (broad symbology coverage; image detection for a subset)
+**Repo:** https://github.com/KarpelesLab/anydcode · **Crate:** `anyd` (crates.io `0.3.0`) · **License:** MIT · **Status:** usable / actively developed (broad symbology coverage; image detection for a subset)
 
-Barcode encoding and decoding written from scratch for about 40 1D, stacked, 2D and postal symbologies: QR/Micro QR/rMQR, Data Matrix, Aztec, PDF417/MicroPDF417, MaxiCode, Han Xin, DotCode, EAN/UPC, Code 128/GS1-128, Code 39/93, ITF, Codabar, DataBar, postal 4-state, Apple App Clip Codes and more. It is always `#![no_std]`. It has no dependencies (only the `cli` feature pulls `oxideav-png`) and a WASM demo. A decoded `Symbol` keeps every encoding decision (segments, version, EC level, mask), so re-encoding reproduces the symbol byte-for-byte. It includes a camera/live-video pipeline (`detect::locate` then decode) on grayscale frames. MSRV 1.89.
+Barcode encoding and decoding written from scratch for about 40 1D, stacked, 2D and postal symbologies: QR/Micro QR/rMQR, Data Matrix (square, rectangular and DMRE sizes, every encodation, GS1 mode since 0.3; `build_rectangular`, `build_gs1`), Aztec, PDF417/MicroPDF417, MaxiCode, Han Xin, DotCode, EAN/UPC, Code 128/GS1-128, Code 39/93, ITF, Codabar, DataBar, postal 4-state, Apple App Clip Codes and more. It is always `#![no_std]`. It has no dependencies (only the `cli` feature pulls `oxideav-png`) and a WASM demo. A decoded `Symbol` keeps every encoding decision (segments, version, EC level, mask), so re-encoding reproduces the symbol byte-for-byte. It includes a camera/live-video pipeline (`detect::locate` then decode) on grayscale frames. MSRV 1.89.
 
 **Use it when:** you generate barcodes (including heap-free `encode_into` on MCUs), decode a module grid or pattern, or scan barcodes from still images or video frames in pure Rust or WASM.
-**Don't use it when / limits:** image detection is implemented only for QR, Data Matrix, Aztec, Micro QR, rMQR, PDF417/MicroPDF417, App Clip and the main 1D codes. MaxiCode, Han Xin, DotCode, Grid Matrix, DataBar, Pharmacode, postal and stacked 1D codes decode structurally but cannot be located in images. PDF417 sampling is affine-only. Image scanning needs `std`. Default features embed about 1.7 MB of App Clip tables, so disable `appclip` if you don't need it.
+**Don't use it when / limits:** image detection is implemented only for QR, Data Matrix, Aztec, Micro QR, rMQR, PDF417/MicroPDF417, App Clip and the main 1D codes. MaxiCode, Han Xin, DotCode, Grid Matrix, DataBar, Pharmacode, postal and stacked 1D codes decode structurally but cannot be located in images. PDF417 sampling is affine-only. (On master, after 0.3.0, MaxiCode and GS1 DataBar non-Limited can also be located in images.) Image scanning needs `std`. Default features embed about 1.7 MB of App Clip tables, so disable `appclip` if you don't need it.
 
 **Add it:**
 ```toml
 [dependencies]
-anyd = "0.2"
-# lean no_std: anyd = { version = "0.2", default-features = false, features = ["alloc", "encode", "decode", "qr", "code128"] }
+anyd = "0.3"
+# lean no_std: anyd = { version = "0.3", default-features = false, features = ["alloc", "encode", "decode", "qr", "code128"] }
 ```
 
 **Key features / cargo features:**
@@ -318,6 +320,8 @@ assert_eq!(encoder.encode(&decoded).unwrap(), encoding); // lossless round-trip
 
 **Gotchas:**
 - The repo is `anydcode`, but the crate and import name is `anyd`.
+- The README's `no_std` snippet still says `version = "0.1"`; use 0.3.
+- 0.3.0 renamed `datamatrix::SquareSpec` to `SymbolSpec` (and added `all_specs()`).
 - The caller converts camera frames to a luminance `GrayFrame`. The crate has no media dependencies.
 - For live video, run cheap `detect::locate` on every frame and decode only the crops (`pipeline::scan_linear_at` for linear regions along the reported axis, `pipeline::scan_all` for matrix codes).
 
