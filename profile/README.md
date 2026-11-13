@@ -2,7 +2,7 @@
 
 **IT Development & R&D based in Tokyo, Japan**
 
-We develop and maintain a wide range of open-source tools and libraries, primarily in **Go** and increasingly in **Rust**, with a focus on cloud infrastructure, networking, cryptography, language runtimes, and system-level utilities — often with an emphasis on pure, dependency-free implementations (no CGO, no C, no FFI).
+We develop and maintain a wide range of open-source tools and libraries, with new work in **Rust** and our long-standing **Go** libraries still maintained. Our focus is cryptography, networking, language runtimes, toolchains, media and system-level utilities, usually as pure, dependency-free implementations (no C, no FFI, no CGO).
 
 [![Website](https://img.shields.io/badge/Website-klb.jp-blue)](https://klb.jp)
 [![OxideAV](https://img.shields.io/badge/GitHub-OxideAV-orange)](https://github.com/OxideAV)
@@ -294,8 +294,8 @@ General-purpose Go libraries and tools.
 
 Our 260+ repositories are predominantly written in:
 
-- **Go** - Cloud infrastructure, networking, crypto, language runtimes, and utilities, including [portablesql](https://github.com/portablesql)
-- **Rust** - A fast-growing pure-Rust ecosystem (browser, JS engine, SQLite, kernel, toolchain, crypto, networking), including the [OxideAV](https://github.com/OxideAV) media stack
+- **Rust** - Where new development happens: a pure-Rust ecosystem spanning crypto, networking, a browser and JS engine, SQLite, a kernel and toolchain, AI inference, and the [OxideAV](https://github.com/OxideAV) media stack
+- **Go** - Our established libraries for cloud infrastructure, networking, crypto, language runtimes and utilities, including [portablesql](https://github.com/portablesql); maintained, with new work moving to Rust
 - **JavaScript/TypeScript** - Frontend frameworks and React/Vue components
 - **C/C++** - Static library bindings and low-level tools
 - **Python** - USD tools and analysis utilities
